@@ -62,5 +62,7 @@ func (g *Gateway) APIList(w http.ResponseWriter, req *http.Request) {
 }
 
 func (g *Gateway) APIConfig(w http.ResponseWriter, req *http.Request) {
+	g.Lock()
+	defer g.Unlock()
 	fmt.Fprintln(w, "Operate", req.Method, server.ReqParams(req))
 }
