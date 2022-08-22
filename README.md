@@ -9,8 +9,11 @@ A terraform provider to manage nginx configuration. Exposes an API for performin
   * Testing nginx configuration
   * Reloading nginx configuration
 
-This repository is currently in development and is not yet ready for use.
+There are two elements to the provider:
 
+  * An API gateway which manages the nginx configuration files and server, and listens for requests from the terraform provider.
+    This server can be run in a docker container, more details are below.
+  * A terraform provider which exposes the API gateway as a resource.
 
 ## Server API
 
