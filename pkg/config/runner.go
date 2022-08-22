@@ -37,6 +37,13 @@ type Event struct {
 	Error error     // Any errors
 }
 
+type Object struct {
+	Name    string `json:"name"`
+	Path    string `json:"path,omitempty"`
+	Enabled bool   `json:"enabled"`
+	Body    []byte `json:"body,omitempty"`
+}
+
 /////////////////////////////////////////////////////////////////////
 // CONSTANTS
 
@@ -129,6 +136,18 @@ func (r *runner) Enumerate() error {
 
 	// Return success
 	return nil
+}
+
+// List returns all configurations
+func (r *runner) List() []Object {
+	result := []Object{}
+	for _, record := range r.available {
+		result = append(result, Object{
+			Name:    record.file.Name(),
+			Enabled: record.enabled,
+		})
+	}
+	return result
 }
 
 /////////////////////////////////////////////////////////////////////

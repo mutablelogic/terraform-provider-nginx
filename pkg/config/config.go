@@ -33,6 +33,12 @@ type config struct {
 }
 
 /////////////////////////////////////////////////////////////////////
+// INTERFACES
+
+type C interface {
+}
+
+/////////////////////////////////////////////////////////////////////
 // GLOBALS
 
 const (
@@ -50,7 +56,7 @@ var (
 func (c Config) New() (*config, error) {
 	this := new(config)
 	// Create folders if they don't exist
-	if path, err := checkPath(c.AvailablePath); err != nil {
+	if path, err := checkPath(c.AvailablePath, false); err != nil {
 		return nil, err
 	} else {
 		this.available = path
@@ -60,7 +66,7 @@ func (c Config) New() (*config, error) {
 			this.readonly = !writable
 		}
 	}
-	if path, err := checkPath(c.EnabledPath); err != nil {
+	if path, err := checkPath(c.EnabledPath, true); err != nil {
 		return nil, err
 	} else {
 		this.enabled = path
@@ -262,17 +268,28 @@ func (c *config) Changed() (bool, error) {
 // PRIVATE METHODS
 
 // check path exists, if not then try and create it
-func checkPath(path string) (string, error) {
+func checkPath(path string, create bool) (string, error) {
 	if path_, err := filepath.Abs(path); err != nil {
 		return "", err
 	} else {
 		path = path_
 	}
-	if info, err := os.Stat(path); os.IsNotExist(err) {
-		if err := os.MkdirAll(path, DIR_CREATE_MODE); err != nil {
-			return "", err
+
+	// Check the path
+	info, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		// Potentially create the folder and return
+		if create {
+			if err := os.MkdirAll(path, DIR_CREATE_MODE); err != nil {
+				return "", err
+			} else {
+				return path, nil
+			}
 		}
-	} else if err != nil {
+	}
+
+	// Check for errors and/or the path is not a directory
+	if err != nil {
 		return "", err
 	} else if !info.IsDir() {
 		return "", ErrBadParameter.With(path)

@@ -10,8 +10,7 @@ import (
 	"syscall"
 
 	// Moudule imports
-	config "github.com/mutablelogic/terraform-provider-nginx/pkg/config"
-	router "github.com/mutablelogic/terraform-provider-nginx/pkg/router"
+
 	server "github.com/mutablelogic/terraform-provider-nginx/pkg/server"
 )
 
@@ -24,26 +23,19 @@ var (
 func main() {
 	flag.Parse()
 
-	// Create a runner
-	runner, err := config.Config{AvailablePath: *flagAvailable, EnabledPath: *flagEnabled}.NewRunner()
+	// Create a new gateway
+	gateway, err := NewGateway(*flagAvailable, *flagEnabled)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
 	// Create a server and a router
-	server, err := server.Config{Addr: *flagAddr, Router: router.NewRouter()}.New()
+	server, err := server.Config{Addr: *flagAddr, Router: gateway}.New()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-
-	// Report runner events
-	go func() {
-		for evt := range runner.C() {
-			fmt.Println("evt=", evt)
-		}
-	}()
 
 	// Run the server and plugins
 	fmt.Println("Running server, press CTRL-C to exit")
@@ -52,7 +44,7 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if err := runner.Run(HandleSignal()); err != nil {
+		if err := gateway.Run(HandleSignal()); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(-1)
 		}
