@@ -1,1 +1,3 @@
-FROM --platform=${PLATFORM}  nginx:${VERSION}
+ARG PLATFORM
+ARG VERSION
+FROM --platform=${PLATFORM}  library/nginx:${VERSION}
