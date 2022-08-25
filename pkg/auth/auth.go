@@ -138,7 +138,30 @@ func (c *auth) Create(name string) (string, error) {
 	c.Lock()
 	defer c.Unlock()
 
-	// TODO
+	// If the name is invalid, then return an error
+	if !reValidName.MatchString(name) {
+		return "", ErrBadParameter.Withf("invalid name: %q", name)
+	}
+	// If the name exists already, then return an error
+	if _, ok := c.tokens[name]; ok {
+		return "", ErrDuplicateEntry.Withf("token already exists: %q", name)
+	}
+	// If the name is the admin token, then return an error
+	if name == adminName {
+		return "", ErrBadParameter.Withf("token is reserved: %q", name)
+	}
+
+	// Create a new token
+	c.tokens[name] = newToken(defaultLength)
+
+	// Write tokens to disk
+	if err := fileWrite(c.filename, c.tokens); err != nil {
+		delete(c.tokens, name)
+		return "", err
+	}
+
+	// Success: return the token value
+	return c.tokens[name].Token, nil
 }
 
 // Revoke a token associated with a name. For the admin token, it is
@@ -147,6 +170,28 @@ func (c *auth) Revoke(name string) error {
 	c.Lock()
 	defer c.Unlock()
 
+	// If the name does not exist, then return an error
+	if _, ok := c.tokens[name]; !ok {
+		return ErrNotFound.Withf("token already exists: %q", name)
+	}
+
+	// Either delete or rotate the token
+	if name == adminName {
+		// Rotate the token
+		c.tokens[name] = newToken(defaultLength)
+	} else {
+		// Delete the token
+		delete(c.tokens, name)
+	}
+
+	// Write tokens to disk
+	if err := fileWrite(c.filename, c.tokens); err != nil {
+		delete(c.tokens, name)
+		return err
+	}
+
+	// Return success
+	return nil
 }
 
 // Return all token names and their last access times
@@ -154,14 +199,32 @@ func (c *auth) Enumerate() map[string]time.Time {
 	c.RLock()
 	defer c.RUnlock()
 
+	var result = make(map[string]time.Time)
+	for k, v := range c.tokens {
+		result[k] = v.Time
+	}
+
+	// Return the result
+	return result
 }
 
 // Returns the name of the token if a value matches. Updates
-// the access time for the token.
+// the access time for the token. If token with value not
+// found, then return empty string
 func (c *auth) Matches(value string) string {
-	c.RLock()
-	defer c.RUnlock()
+	c.Lock()
+	defer c.Unlock()
 
+	for k, v := range c.tokens {
+		if v.Token == value {
+			v.Time = time.Now()
+			// TODO: Update time
+			return k
+		}
+	}
+
+	// Token not found
+	return ""
 }
 
 /////////////////////////////////////////////////////////////////////
