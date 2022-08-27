@@ -2,6 +2,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -14,6 +15,8 @@ import (
 
 	// Module imports
 
+	event "github.com/mutablelogic/terraform-provider-nginx/pkg/event"
+
 	// Namespace imports
 	. "github.com/djthorpe/go-errors"
 )
@@ -22,14 +25,19 @@ import (
 // TYPES
 
 type Config struct {
-	Path string
-	File string
+	Path  string
+	File  string
+	Delta time.Duration
 }
 
 type auth struct {
 	sync.RWMutex
-	filename string
+
+	delta    time.Duration
+	path     string
 	tokens   map[string]*token
+	modified bool
+	ch       chan *event.Event
 }
 
 type token struct {
@@ -41,9 +49,14 @@ type token struct {
 // GLOBALS
 
 const (
-	defaultFile   = "auth,json"
-	defaultLength = 32
-	adminName     = "admin"
+	defaultFile                 = "auth,json"
+	defaultLength               = 32
+	defaultDelta                = time.Second * 30
+	defaultEventChannelCapacity = 1000
+)
+
+const (
+	AdminToken = "admin"
 )
 
 var (
@@ -55,6 +68,8 @@ var (
 
 func (c Config) New() (*auth, error) {
 	this := new(auth)
+	this.ch = make(chan *event.Event, defaultEventChannelCapacity)
+	this.delta = defaultDelta
 
 	// Check for path
 	if stat, err := os.Stat(c.Path); err != nil {
@@ -72,29 +87,55 @@ func (c Config) New() (*auth, error) {
 	if fn, err := filepath.Abs(filepath.Join(c.Path, c.File)); err != nil {
 		return nil, err
 	} else {
-		this.filename = fn
+		this.path = fn
 	}
 
 	// Read the file if it exists
-	if tokens, err := fileRead(this.filename); err != nil {
+	if tokens, err := fileRead(this.path); err != nil {
 		return nil, err
 	} else {
 		this.tokens = tokens
 	}
 
 	// If the admin token does not exist, then create it
-	if _, ok := this.tokens[adminName]; !ok {
+	if _, ok := this.tokens[AdminToken]; !ok {
 		// Create a new token
-		this.tokens[adminName] = newToken(defaultLength)
+		this.tokens[AdminToken] = newToken(defaultLength)
 	}
 
 	// Write tokens to disk
-	if err := fileWrite(this.filename, this.tokens); err != nil {
+	if err := fileWrite(this.path, this.tokens); err != nil {
 		return nil, err
+	}
+
+	// Set delta
+	if c.Delta != 0 {
+		this.delta = c.Delta
 	}
 
 	// Return success
 	return this, nil
+}
+
+// Run will write the authorization tokens back to disk if they have been modified
+func (c *auth) Run(ctx context.Context) error {
+	ticker := time.NewTicker(c.delta)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			close(c.ch)
+			_, err := c.writeIfModified()
+			return err
+		case <-ticker.C:
+			if written, err := c.writeIfModified(); err != nil {
+				event.NewError(err).Emit(c.ch)
+			} else if written {
+				event.NewEvent(nil, "Written tokens to disk").Emit(c.ch)
+			}
+		}
+	}
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -102,10 +143,11 @@ func (c Config) New() (*auth, error) {
 
 func (c *auth) String() string {
 	str := "<auth"
-	str += fmt.Sprintf(" filename=%q", c.filename)
+	str += fmt.Sprintf(" path=%q", c.path)
 	for k, v := range c.tokens {
 		str += fmt.Sprintf(" %v=%v", k, v)
 	}
+	str += fmt.Sprint(" delta=", c.delta)
 	return str + ">"
 }
 
@@ -119,6 +161,11 @@ func (t *token) String() string {
 /////////////////////////////////////////////////////////////////////
 // PUBLIC METHODS
 
+// Return event channel
+func (c *auth) C() <-chan *event.Event {
+	return c.ch
+}
+
 // Return true if a token associated with the name already exists
 func (c *auth) Exists(name string) bool {
 	c.RLock()
@@ -126,11 +173,6 @@ func (c *auth) Exists(name string) bool {
 
 	_, ok := c.tokens[name]
 	return ok
-}
-
-// Return true if a token associated with the name is the admin token
-func (c *auth) IsAdmin(name string) bool {
-	return name == adminName
 }
 
 // Create a new token associated with a name and return it.
@@ -147,18 +189,15 @@ func (c *auth) Create(name string) (string, error) {
 		return "", ErrDuplicateEntry.Withf("token already exists: %q", name)
 	}
 	// If the name is the admin token, then return an error
-	if name == adminName {
+	if name == AdminToken {
 		return "", ErrBadParameter.Withf("token is reserved: %q", name)
 	}
 
 	// Create a new token
 	c.tokens[name] = newToken(defaultLength)
 
-	// Write tokens to disk
-	if err := fileWrite(c.filename, c.tokens); err != nil {
-		delete(c.tokens, name)
-		return "", err
-	}
+	// Set modified flag
+	c.setModified(true)
 
 	// Success: return the token value
 	return c.tokens[name].Token, nil
@@ -176,7 +215,7 @@ func (c *auth) Revoke(name string) error {
 	}
 
 	// Either delete or rotate the token
-	if name == adminName {
+	if name == AdminToken {
 		// Rotate the token
 		c.tokens[name] = newToken(defaultLength)
 	} else {
@@ -184,11 +223,8 @@ func (c *auth) Revoke(name string) error {
 		delete(c.tokens, name)
 	}
 
-	// Write tokens to disk
-	if err := fileWrite(c.filename, c.tokens); err != nil {
-		delete(c.tokens, name)
-		return err
-	}
+	// Set modified flag
+	c.setModified(true)
 
 	// Return success
 	return nil
@@ -229,6 +265,29 @@ func (c *auth) Matches(value string) string {
 
 /////////////////////////////////////////////////////////////////////
 // PRIVATE METHODS
+
+// setModified sets a new modified value, and returns true if changed
+func (c *auth) setModified(modified bool) bool {
+	if modified != c.modified {
+		c.modified = modified
+		return true
+	} else {
+		return false
+	}
+}
+
+// write the tokens to disk if modified
+func (c *auth) writeIfModified() (bool, error) {
+	modified := c.setModified(false)
+	if modified {
+		if err := fileWrite(c.path, c.tokens); err != nil {
+			return modified, err
+		}
+	}
+
+	// Return success
+	return modified, nil
+}
 
 func fileRead(filename string) (map[string]*token, error) {
 	var result = map[string]*token{}

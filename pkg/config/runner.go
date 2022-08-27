@@ -29,14 +29,6 @@ type record struct {
 	marked  bool
 }
 
-type EventType uint
-
-type Event struct {
-	Type  EventType // Type associated with the event
-	File  File      // File associated with the event
-	Error error     // Any errors
-}
-
 type Object struct {
 	Name    string `json:"name"`
 	Path    string `json:"path,omitempty"`
