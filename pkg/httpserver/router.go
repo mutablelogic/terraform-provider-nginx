@@ -1,10 +1,15 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"regexp"
 	"sync"
+
+	// Namespace imports
+	. "github.com/djthorpe/go-errors"
+	. "github.com/mutablelogic/terraform-provider-nginx"
 )
 
 /////////////////////////////////////////////////////////////////////
@@ -36,15 +41,38 @@ func NewRouter() *router {
 	return this
 }
 
+func (r *router) Run(context.Context, Kernel) error {
+	return nil
+}
+
+/////////////////////////////////////////////////////////////////////
+// STRINGIFY
+
+func (r *router) String() string {
+	str := "<router"
+	for _, route := range r.routes {
+		str += fmt.Sprintf(" %q => %q", route.path, route.methods)
+	}
+	return str + ">"
+}
+
 /////////////////////////////////////////////////////////////////////
 // PUBLIC METHODS
 
-func (r *router) AddRoute(path *regexp.Regexp, fn http.HandlerFunc, methods ...string) {
+func (r *router) AddHandler(prefix string, path *regexp.Regexp, fn http.HandlerFunc, methods ...string) error {
 	// If methods is empty, default to GET
 	if len(methods) == 0 {
 		methods = []string{"GET"}
 	}
 	r.routes = append(r.routes, route{path, fn, methods})
+
+	// Return success
+	return nil
+}
+
+func (r *router) AddMiddleware(prefix string, fn ...Middleware) error {
+	// TODO
+	return ErrNotImplemented
 }
 
 func (r *router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -64,6 +92,10 @@ func (r *router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ServeError(w, http.StatusMethodNotAllowed)
 }
 
+func (*router) C() <-chan Event {
+	return nil
+}
+
 /////////////////////////////////////////////////////////////////////
 // PRIVATE METHODS
 
@@ -78,7 +110,7 @@ func (r *router) get(path string) (*route, []string) {
 
 	// Search routes
 	for i := range r.routes {
-		fmt.Println("Check", r.routes[i].path)
+		//fmt.Println("Check", r.routes[i].path)
 		route := &r.routes[i]
 		if params := route.path.FindStringSubmatch(path); params != nil {
 			// Set cache

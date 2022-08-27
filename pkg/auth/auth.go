@@ -14,11 +14,11 @@ import (
 	"time"
 
 	// Module imports
-
 	event "github.com/mutablelogic/terraform-provider-nginx/pkg/event"
 
 	// Namespace imports
 	. "github.com/djthorpe/go-errors"
+	. "github.com/mutablelogic/terraform-provider-nginx"
 )
 
 /////////////////////////////////////////////////////////////////////
@@ -37,7 +37,7 @@ type auth struct {
 	path     string
 	tokens   map[string]*token
 	modified bool
-	ch       chan *event.Event
+	ch       chan Event
 }
 
 type token struct {
@@ -68,7 +68,7 @@ var (
 
 func (c Config) New() (*auth, error) {
 	this := new(auth)
-	this.ch = make(chan *event.Event, defaultEventChannelCapacity)
+	this.ch = make(chan Event, defaultEventChannelCapacity)
 	this.delta = defaultDelta
 
 	// Check for path
@@ -118,7 +118,7 @@ func (c Config) New() (*auth, error) {
 }
 
 // Run will write the authorization tokens back to disk if they have been modified
-func (c *auth) Run(ctx context.Context) error {
+func (c *auth) Run(ctx context.Context, _ Kernel) error {
 	ticker := time.NewTicker(c.delta)
 	defer ticker.Stop()
 
@@ -162,7 +162,7 @@ func (t *token) String() string {
 // PUBLIC METHODS
 
 // Return event channel
-func (c *auth) C() <-chan *event.Event {
+func (c *auth) C() <-chan Event {
 	return c.ch
 }
 
@@ -182,15 +182,15 @@ func (c *auth) Create(name string) (string, error) {
 
 	// If the name is invalid, then return an error
 	if !reValidName.MatchString(name) {
-		return "", ErrBadParameter.Withf("invalid name: %q", name)
+		return "", ErrBadParameter.Withf("%q", name)
 	}
 	// If the name exists already, then return an error
 	if _, ok := c.tokens[name]; ok {
-		return "", ErrDuplicateEntry.Withf("token already exists: %q", name)
+		return "", ErrDuplicateEntry.Withf("%q", name)
 	}
 	// If the name is the admin token, then return an error
 	if name == AdminToken {
-		return "", ErrBadParameter.Withf("token is reserved: %q", name)
+		return "", ErrBadParameter.Withf("%q", name)
 	}
 
 	// Create a new token
@@ -211,13 +211,16 @@ func (c *auth) Revoke(name string) error {
 
 	// If the name does not exist, then return an error
 	if _, ok := c.tokens[name]; !ok {
-		return ErrNotFound.Withf("token already exists: %q", name)
+		return ErrNotFound.Withf("%q", name)
 	}
 
 	// Either delete or rotate the token
+	var immediately bool
 	if name == AdminToken {
 		// Rotate the token
 		c.tokens[name] = newToken(defaultLength)
+		// Write immediately
+		immediately = true
 	} else {
 		// Delete the token
 		delete(c.tokens, name)
@@ -225,6 +228,15 @@ func (c *auth) Revoke(name string) error {
 
 	// Set modified flag
 	c.setModified(true)
+
+	// Write to disk immediately when admin token is rotated
+	if immediately {
+		if written, err := c.writeIfModified(); err != nil {
+			return err
+		} else if written {
+			event.NewEvent(nil, "Admin token rotated").Emit(c.ch)
+		}
+	}
 
 	// Return success
 	return nil
@@ -254,7 +266,7 @@ func (c *auth) Matches(value string) string {
 	for k, v := range c.tokens {
 		if v.Token == value {
 			v.Time = time.Now()
-			// TODO: Update time
+			c.setModified(true)
 			return k
 		}
 	}

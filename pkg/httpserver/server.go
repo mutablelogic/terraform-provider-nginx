@@ -12,6 +12,9 @@ import (
 	// Modules
 	multierror "github.com/hashicorp/go-multierror"
 	fcgi "github.com/mutablelogic/terraform-provider-nginx/pkg/fcgi"
+
+	// Namespace imports
+	. "github.com/mutablelogic/terraform-provider-nginx"
 )
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -21,7 +24,6 @@ type Config struct {
 	Addr    string        // Address or path for binding HTTP server
 	TLS     *TLS          // TLS parameters
 	Timeout time.Duration // Read timeout on HTTP requests
-	Router  http.Handler
 }
 
 type TLS struct {
@@ -45,12 +47,16 @@ const (
 // LIFECYCLE
 
 // Create the module
-func (cfg Config) New() (*server, error) {
+func (cfg Config) New(handler http.Handler) (*server, error) {
 	this := new(server)
+
+	if handler == nil {
+		handler = http.DefaultServeMux
+	}
 
 	// Check addr for being (host, port). If not, then run as FCGI server
 	if _, _, err := net.SplitHostPort(cfg.Addr); cfg.Addr != "" && err != nil {
-		if err := this.fcgiserver(cfg.Addr, cfg.Router); err != nil {
+		if err := this.fcgiserver(cfg.Addr, handler); err != nil {
 			return nil, err
 		} else {
 			return this, nil
@@ -79,7 +85,7 @@ func (cfg Config) New() (*server, error) {
 	}
 
 	// Create net server
-	if err := this.netserver(cfg.Addr, tlsconfig, cfg.Timeout, cfg.Router); err != nil {
+	if err := this.netserver(cfg.Addr, tlsconfig, cfg.Timeout, handler); err != nil {
 		return nil, err
 	}
 
@@ -87,7 +93,7 @@ func (cfg Config) New() (*server, error) {
 	return this, nil
 }
 
-func (this *server) Run(ctx context.Context) error {
+func (this *server) Run(ctx context.Context, _ Kernel) error {
 	var result error
 	go func() {
 		<-ctx.Done()
@@ -118,6 +124,13 @@ func (this *server) String() string {
 		}
 	}
 	return str + ">"
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// PUBLIC METHODS
+
+func (*server) C() <-chan Event {
+	return nil
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -1,42 +1,49 @@
 package event
 
-import "fmt"
+import (
+	"fmt"
 
-type Event struct {
-	Type  any   // Type associated with the event
-	Value any   // Value associated with the event
-	Error error // Any errors
+	// Namespace imports
+	. "github.com/mutablelogic/terraform-provider-nginx"
+)
+
+/////////////////////////////////////////////////////////////////////
+// TYPES
+
+type event struct {
+	key, value any
+	err        error // Any errors
 }
 
 /////////////////////////////////////////////////////////////////////
 // LIFECYCLE
 
-func NewEvent(t any, v any) *Event {
-	return &Event{Type: t, Value: v}
+func NewEvent(key, value any) *event {
+	return &event{key, value, nil}
 }
 
-func NewError(err error) *Event {
-	return &Event{Error: err}
+func NewError(err error) *event {
+	return &event{nil, nil, err}
 }
 
 /////////////////////////////////////////////////////////////////////
 // STRINGIFY
 
-func (e *Event) String() string {
+func (e *event) String() string {
 	str := "<event"
-	if e.Type != nil {
-		str += fmt.Sprint(" type=", e.Type)
+	if e.key != nil {
+		str += fmt.Sprint(" key=", e.key)
 	}
-	if e.Value != nil {
-		switch e.Value.(type) {
+	if e.value != nil {
+		switch e.value.(type) {
 		case string:
-			str += fmt.Sprintf(" value=%q", e.Value)
+			str += fmt.Sprintf(" value=%q", e.value)
 		default:
-			str += fmt.Sprint(" value=", e.Value)
+			str += fmt.Sprint(" value=", e.value)
 		}
 	}
-	if e.Error != nil {
-		str += fmt.Sprint(" error=", e.Error)
+	if e.err != nil {
+		str += fmt.Sprint(" error=", e.err)
 	}
 	return str + ">"
 }
@@ -44,7 +51,19 @@ func (e *Event) String() string {
 /////////////////////////////////////////////////////////////////////
 // PUBLIC METHODS
 
-func (e *Event) Emit(ch chan<- *Event) bool {
+func (e *event) Key() any {
+	return e.key
+}
+
+func (e *event) Value() any {
+	return e.value
+}
+
+func (e *event) Error() error {
+	return e.err
+}
+
+func (e *event) Emit(ch chan<- Event) bool {
 	select {
 	case ch <- e:
 		return true
