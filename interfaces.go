@@ -48,9 +48,9 @@ type RouterTask interface {
 	// Add a prefix/path mapping to a handler for one or more HTTP methods
 	AddHandler(prefix string, path *regexp.Regexp, fn http.HandlerFunc, methods ...string) error
 
-	// Add middleware to the router for a specific prefix
-	AddMiddleware(prefix string, fn ...Middleware) error
-}
+	// Add middleware for a unique name
+	AddMiddleware(name string, fn func(http.HandlerFunc) http.HandlerFunc) error
 
-// Middleware wraps a handler inside another
-type Middleware func(http.Handler) http.Handler
+	// Set middleware for a prefix. Called from left to right.
+	SetMiddleware(prefix string, chain ...string) error
+}

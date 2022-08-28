@@ -10,10 +10,10 @@ import (
 	"syscall"
 
 	// Moudule imports
-	auth "github.com/mutablelogic/terraform-provider-nginx/pkg/auth"
 	authgw "github.com/mutablelogic/terraform-provider-nginx/pkg/authgw"
 	httpserver "github.com/mutablelogic/terraform-provider-nginx/pkg/httpserver"
 	kernel "github.com/mutablelogic/terraform-provider-nginx/pkg/kernel"
+	tokenauth "github.com/mutablelogic/terraform-provider-nginx/pkg/tokenauth"
 )
 
 var (
@@ -28,14 +28,14 @@ func main() {
 	kernel := kernel.New()
 
 	// Auth task
-	auth, err := auth.Config{Path: *flagPath}.New()
+	auth, err := tokenauth.Config{Path: *flagPath}.New()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(-1)
-	} else if err := kernel.Add("auth", auth); err != nil {
+	} else if err := kernel.Add("tokenauth", auth); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(-1)
-	} else if err := kernel.Add("authgw", authgw.New(auth, "/v1/auth")); err != nil {
+	} else if err := kernel.Add("authgw", authgw.New(auth, "/auth/v1")); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(-1)
 	}
@@ -56,8 +56,11 @@ func main() {
 		os.Exit(-1)
 	}
 
-	// AuthAdmin middleware makes sure only admin authenticated users can access the authgw endpoint
-	//kernel.AddMiddleware("authgw", authgw.AuthAdmin)
+	// Only admin authenticated users should be able to access pages under the /auth/v1 endpoint
+	if err := kernel.SetMiddleware("/auth/v1", "token-auth", "token-admin-auth"); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(-1)
+	}
 
 	// Go routine for receiving events
 	go func() {
@@ -86,3 +89,14 @@ func HandleSignal() context.Context {
 	}()
 	return ctx
 }
+
+/*
+task "auth-gw" {
+	path = "/var/lib/nginx-gw"
+    prefix = "/auth/v1"
+    middleware = [ "token-auth", "token-admin-auth" ]
+}
+task "nginx-gw" {
+    path = "/var/lib/nginx-gw"
+}
+*/

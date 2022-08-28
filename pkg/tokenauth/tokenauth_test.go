@@ -1,4 +1,4 @@
-package auth_test
+package tokenauth_test
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"time"
 
 	// Module import
-	. "github.com/mutablelogic/terraform-provider-nginx/pkg/auth"
+	. "github.com/mutablelogic/terraform-provider-nginx/pkg/tokenauth"
 )
 
 /////////////////////////////////////////////////////////////////////
@@ -65,7 +65,7 @@ func Test_Auth_002(t *testing.T) {
 	// Run in foreground for a few seconds
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
-	if err := auth.Run(ctx); err != nil {
+	if err := auth.Run(ctx, nil); err != nil {
 		t.Error(err)
 	}
 }
@@ -120,7 +120,7 @@ func Test_Auth_003(t *testing.T) {
 	// Run in foreground for a few seconds
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
-	if err := auth.Run(ctx); err != nil {
+	if err := auth.Run(ctx, nil); err != nil {
 		t.Error(err)
 	}
 }

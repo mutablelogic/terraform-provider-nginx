@@ -2,6 +2,7 @@ package kernel
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -85,7 +86,7 @@ func (k *kernel) Run(ctx context.Context) error {
 		go func(key string, task Task) {
 			defer k.wg.Done()
 			event.NewEvent(KernelEventStart, task).Emit(k.ch)
-			if err := task.Run(ctx, k); err != nil {
+			if err := task.Run(ctx, k); err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 				event.NewError(fmt.Errorf("%v: %w", key, err)).Emit(k.ch)
 				result = multierror.Append(result, err)
 			} else {

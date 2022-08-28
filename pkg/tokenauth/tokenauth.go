@@ -1,5 +1,5 @@
-// auth package manages the authentication tokens
-package auth
+// tokenauth package manages the authentication tokens
+package tokenauth
 
 import (
 	"context"
@@ -49,7 +49,7 @@ type token struct {
 // GLOBALS
 
 const (
-	defaultFile                 = "auth,json"
+	defaultFile                 = "tokenauth.json"
 	defaultLength               = 32
 	defaultDelta                = time.Second * 30
 	defaultEventChannelCapacity = 1000

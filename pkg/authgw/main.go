@@ -8,8 +8,8 @@ import (
 	"time"
 
 	// Modules
-	auth "github.com/mutablelogic/terraform-provider-nginx/pkg/auth"
 	httpserver "github.com/mutablelogic/terraform-provider-nginx/pkg/httpserver"
+	tokenauth "github.com/mutablelogic/terraform-provider-nginx/pkg/tokenauth"
 
 	// Namespace imports
 	. "github.com/mutablelogic/terraform-provider-nginx"
@@ -18,7 +18,7 @@ import (
 /////////////////////////////////////////////////////////////////////
 // TYPES
 
-type Auth interface {
+type TokenAuth interface {
 	Exists(name string) bool
 	Create(name string) (string, error)
 	Revoke(name string) error
@@ -27,13 +27,14 @@ type Auth interface {
 }
 
 type authgw struct {
-	Auth
+	TokenAuth
 	prefix string
 }
 
 type token struct {
 	Token      string    `json:"token"`
-	AccessTime time.Time `json:"access_time"`
+	Admin      bool      `json:"admin,omitempty"`
+	AccessTime time.Time `json:"access_time,omitempty"`
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -47,11 +48,18 @@ var (
 /////////////////////////////////////////////////////////////////////
 // LIFECYCLE
 
-func New(auth Auth, prefix string) *authgw {
+func New(auth TokenAuth, prefix string) *authgw {
 	return &authgw{auth, prefix}
 }
 
 func (a *authgw) Run(ctx context.Context, kernel Kernel) error {
+	// Add middleware
+	if err := kernel.AddMiddleware("token-auth", a.AuthenticateRequest); err != nil {
+		return err
+	}
+	if err := kernel.AddMiddleware("token-admin-auth", a.AuthenticateAdminRequest); err != nil {
+		return err
+	}
 	// Add routes
 	if err := kernel.AddHandler(a.prefix, reEnumerateTokens, a.EnumerateTokens); err != nil {
 		return err
@@ -60,8 +68,9 @@ func (a *authgw) Run(ctx context.Context, kernel Kernel) error {
 		return err
 	}
 
-	// Return success
-	return nil
+	// Wait until cancel
+	<-ctx.Done()
+	return ctx.Err()
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -71,11 +80,14 @@ func (*authgw) C() <-chan Event {
 	return nil
 }
 
+/////////////////////////////////////////////////////////////////////
+// HTTP HANDLERS
+
 // Handler to enumerate existing tokens
 func (a *authgw) EnumerateTokens(w http.ResponseWriter, req *http.Request) {
 	var result []token
 	for name, accessTime := range a.Enumerate() {
-		result = append(result, token{name, accessTime})
+		result = append(result, token{name, name == tokenauth.AdminToken, accessTime})
 	}
 	httpserver.ServeJSON(w, result, http.StatusOK, 2)
 }
@@ -106,14 +118,13 @@ func (a *authgw) CreateRevokeToken(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+/////////////////////////////////////////////////////////////////////
+// HTTP MIDDLEWARE
+
 // Middleware to authenticate a request
 func (a *authgw) AuthenticateRequest(child http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		auth := req.Header.Get("Authorization")
-		if auth == "" {
-			httpserver.ServeError(w, http.StatusUnauthorized)
-			return
-		}
 		if !strings.HasPrefix(auth, "Token ") {
 			httpserver.ServeError(w, http.StatusUnauthorized)
 			return
@@ -131,7 +142,7 @@ func (a *authgw) AuthenticateRequest(child http.HandlerFunc) http.HandlerFunc {
 // Middleware to authenticate an admin request
 func (a *authgw) AuthenticateAdminRequest(child http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		if token := ReqToken(req); token != auth.AdminToken {
+		if token := ReqToken(req); token != tokenauth.AdminToken {
 			httpserver.ServeError(w, http.StatusUnauthorized)
 			return
 		} else {

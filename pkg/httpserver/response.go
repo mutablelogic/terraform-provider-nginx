@@ -1,4 +1,4 @@
-package server
+package httpserver
 
 import (
 	"encoding/json"
@@ -10,7 +10,7 @@ import (
 // TYPES
 
 type ErrorResponse struct {
-	Code   int    `json:"code"`
+	Code   uint   `json:"code"`
 	Reason string `json:"reason,omitempty"`
 }
 
@@ -37,17 +37,17 @@ func ServeJSON(w http.ResponseWriter, v interface{}, code, indent uint) error {
 }
 
 // ServeText is a utility function to serve plaintext
-func ServeText(w http.ResponseWriter, v string, code int) {
+func ServeText(w http.ResponseWriter, v string, code uint) {
 	w.Header().Add("Content-Type", ContentTypeText)
-	w.WriteHeader(code)
+	w.WriteHeader(int(code))
 	w.Write([]byte(v + "\n"))
 }
 
 // ServeError is a utility function to serve a JSON error notice
-func ServeError(w http.ResponseWriter, code int, reason ...string) error {
+func ServeError(w http.ResponseWriter, code uint, reason ...string) error {
 	err := ErrorResponse{code, strings.Join(reason, " ")}
 	if len(reason) == 0 {
-		err.Reason = http.StatusText(code)
+		err.Reason = http.StatusText(int(code))
 	}
-	return ServeJSON(w, err, uint(code), 0)
+	return ServeJSON(w, err, code, 0)
 }
