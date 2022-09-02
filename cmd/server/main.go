@@ -11,7 +11,7 @@ import (
 
 	// Moudule imports
 
-	server "github.com/mutablelogic/terraform-provider-nginx/pkg/server"
+	server "github.com/mutablelogic/terraform-provider-nginx/pkg/httpserver"
 )
 
 var (

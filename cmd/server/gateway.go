@@ -9,7 +9,7 @@ import (
 
 	// Moudule imports
 	config "github.com/mutablelogic/terraform-provider-nginx/pkg/config"
-	server "github.com/mutablelogic/terraform-provider-nginx/pkg/server"
+	server "github.com/mutablelogic/terraform-provider-nginx/pkg/httpserver"
 )
 
 type Runner interface {
