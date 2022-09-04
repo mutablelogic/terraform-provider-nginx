@@ -14,7 +14,7 @@ import (
 type varblock struct {
 	Label       string `hcl:"label,label"`
 	Type        string `hcl:"type"`
-	Default     string `hcl:"default,optional"`
+	Default     any    `hcl:"default,optional"`
 	Description string `hcl:"description,optional"`
 }
 
@@ -40,8 +40,11 @@ func (v *varblock) String() string {
 	if v.Type != "" {
 		str += fmt.Sprintf(" type=%q", v.Type)
 	}
-	if v.Default != "" {
+	switch v.Default.(type) {
+	case string:
 		str += fmt.Sprintf(" default=%q", v.Default)
+	default:
+		str += fmt.Sprintf(" default=%v", v.Default)
 	}
 	if v.Description != "" {
 		str += fmt.Sprintf(" description=%q", v.Description)

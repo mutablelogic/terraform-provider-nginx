@@ -25,13 +25,13 @@ func FromCtyValue(val cty.Value, target interface{}) error {
 		return ErrBadParameter.With("target is nil")
 	}
 
-	return fromCtyValue(val, v, make(cty.Path, 0))
+	return fromCtyValue(val, v)
 }
 
 /////////////////////////////////////////////////////////////////////
 // PRIVATE METHODS
 
-func fromCtyValue(val cty.Value, target reflect.Value, path cty.Path) error {
+func fromCtyValue(val cty.Value, target reflect.Value) error {
 	t := val.Type()
 
 	// Set target to element
@@ -39,7 +39,11 @@ func fromCtyValue(val cty.Value, target reflect.Value, path cty.Path) error {
 		target = target.Elem()
 	}
 	if !target.CanSet() {
-		return ErrBadParameter.With("cannot set target of type", target.Type())
+		if target.IsValid() {
+			return ErrBadParameter.With("cannot set target of type", target.Type())
+		} else {
+			return ErrBadParameter.With("cannot set target")
+		}
 	}
 
 	// Where value is nil, return zero-value for type
@@ -50,56 +54,54 @@ func fromCtyValue(val cty.Value, target reflect.Value, path cty.Path) error {
 
 	switch t {
 	case cty.Bool:
-		return fromCtyBool(val, target, path)
+		return fromCtyBool(val, target)
 	case cty.Number:
-		return fromCtyNumber(val, target, path)
+		return fromCtyNumber(val, target)
 	case cty.String:
-		return fromCtyString(val, target, path)
+		return fromCtyString(val, target)
 	}
 	switch {
 	case t.IsListType() || t.IsSetType():
-		return fromCtyList(val, target, path)
+		return fromCtyList(val, target)
 	case t.IsMapType():
-		return fromCtyMap(val, target, path)
+		return fromCtyMap(val, target)
 	case t.IsObjectType():
-		return fromCtyObject(val, target, path)
-		/*
-			case t.IsTupleType():
-				return fromCtyTuple(val, target, path)
-			case t.IsCapsuleType():
-				return fromCtyCapsule(val, target, path)
-		*/
+		return fromCtyObject(val, target)
+	case t.IsTupleType():
+		return fromCtyTuple(val, target)
+	default:
+		return ErrBadParameter.With("unsupported source type: ", t.GoString())
 	}
-
-	return ErrBadParameter.With("unsupported source type: ", t.GoString())
 }
 
-func fromCtyBool(val cty.Value, target reflect.Value, path cty.Path) error {
+func fromCtyBool(val cty.Value, target reflect.Value) error {
 	switch {
 	case target.Kind() == reflect.Bool:
 		target.SetBool(val.True())
 	case target.Type() == typeAny:
 		target.Set(reflect.ValueOf(val.True()))
 	default:
-		return path.NewErrorf("bool type is required")
+		return ErrBadParameter.With("bool type is required")
 	}
+
+	// Return success
 	return nil
 }
 
-func fromCtyNumber(val cty.Value, target reflect.Value, path cty.Path) error {
+func fromCtyNumber(val cty.Value, target reflect.Value) error {
 	switch target.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return fromCtyNumberInt(val, target, path)
+		return fromCtyNumberInt(val, target)
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return fromCtyNumberUInt(val, target, path)
+		return fromCtyNumberUInt(val, target)
 	case reflect.Float32, reflect.Float64:
-		return fromCtyNumberFloat(val, target, path)
+		return fromCtyNumberFloat(val, target)
 	default:
-		return path.NewErrorf("number type is required, not %v", target.Kind())
+		return ErrBadParameter.Withf("number type is required, not %v", target.Kind())
 	}
 }
 
-func fromCtyNumberInt(val cty.Value, target reflect.Value, path cty.Path) error {
+func fromCtyNumberInt(val cty.Value, target reflect.Value) error {
 	var min, max int64
 	switch target.Type().Bits() {
 	case 8:
@@ -118,14 +120,16 @@ func fromCtyNumberInt(val cty.Value, target reflect.Value, path cty.Path) error 
 
 	iv, accuracy := val.AsBigFloat().Int64()
 	if accuracy != big.Exact || iv < min || iv > max {
-		return path.NewErrorf("integer type is required, not %v", target.Kind())
+		return ErrBadParameter.Withf("integer type is required, not %v", target.Kind())
+	} else {
+		target.SetInt(iv)
 	}
 
-	target.SetInt(iv)
+	// Return success
 	return nil
 }
 
-func fromCtyNumberUInt(val cty.Value, target reflect.Value, path cty.Path) error {
+func fromCtyNumberUInt(val cty.Value, target reflect.Value) error {
 	var max uint64
 	switch target.Type().Bits() {
 	case 8:
@@ -140,14 +144,16 @@ func fromCtyNumberUInt(val cty.Value, target reflect.Value, path cty.Path) error
 
 	iv, accuracy := val.AsBigFloat().Uint64()
 	if accuracy != big.Exact || iv > max {
-		return path.NewErrorf("unsigned integer type is required, not %v", target.Kind())
+		return ErrBadParameter.Withf("unsigned integer type is required, not %v", target.Kind())
+	} else {
+		target.SetUint(iv)
 	}
 
-	target.SetUint(iv)
+	// Return success
 	return nil
 }
 
-func fromCtyNumberFloat(val cty.Value, target reflect.Value, path cty.Path) error {
+func fromCtyNumberFloat(val cty.Value, target reflect.Value) error {
 	switch {
 	case target.Kind() == reflect.Float32 || target.Kind() == reflect.Float64:
 		fv, _ := val.AsBigFloat().Float64()
@@ -156,37 +162,37 @@ func fromCtyNumberFloat(val cty.Value, target reflect.Value, path cty.Path) erro
 		fv, _ := val.AsBigFloat().Float64()
 		target.Set(reflect.ValueOf(fv))
 	default:
-		return path.NewErrorf("float type is required, not %v", target.Kind())
-	}
-	return nil
-}
-
-func fromCtyString(val cty.Value, target reflect.Value, path cty.Path) error {
-	switch {
-	case target.Kind() == reflect.String:
-		target.SetString(val.AsString())
-	case target.Type() == typeAny:
-		target.Set(reflect.ValueOf(val.AsString()))
-	default:
-		return path.NewErrorf("string type is required, not %q", target.Kind())
+		return ErrBadParameter.Withf("float type is required, not %v", target.Kind())
 	}
 
 	// Return success
 	return nil
 }
 
-func fromCtyList(val cty.Value, target reflect.Value, path cty.Path) error {
+func fromCtyString(val cty.Value, target reflect.Value) error {
+	switch {
+	case target.Kind() == reflect.String:
+		target.SetString(val.AsString())
+	case target.Type() == typeAny:
+		target.Set(reflect.ValueOf(val.AsString()))
+	default:
+		return ErrBadParameter.Withf("string type is required, not %q", target.Kind())
+	}
+
+	// Return success
+	return nil
+}
+
+func fromCtyList(val cty.Value, target reflect.Value) error {
 	var result error
-	path = append(path, nil)
-	i := 0
+	var i int
 
 	switch target.Kind() {
 	case reflect.Slice:
 		length := val.LengthInt()
 		tv := reflect.MakeSlice(target.Type(), length, length)
 		if !val.ForEachElement(func(key cty.Value, val cty.Value) bool {
-			path[len(path)-1] = cty.IndexStep{Key: key}
-			if err := fromCtyValue(val, tv.Index(i), path); err != nil {
+			if err := fromCtyValue(val, tv.Index(i)); err != nil {
 				result = multierror.Append(result, err)
 				return true
 			}
@@ -198,11 +204,10 @@ func fromCtyList(val cty.Value, target reflect.Value, path cty.Path) error {
 	case reflect.Array:
 		length := val.LengthInt()
 		if length != target.Len() {
-			result = multierror.Append(result, path.NewErrorf("must be a list of length %d", target.Len()))
+			result = multierror.Append(result, ErrBadParameter.Withf("must be a list of length %d", target.Len()))
 		} else {
 			val.ForEachElement(func(key cty.Value, val cty.Value) bool {
-				path[len(path)-1] = cty.IndexStep{Key: key}
-				if err := fromCtyValue(val, target.Index(i), path); err != nil {
+				if err := fromCtyValue(val, target.Index(i)); err != nil {
 					result = multierror.Append(result, err)
 					return true
 				}
@@ -211,30 +216,27 @@ func fromCtyList(val cty.Value, target reflect.Value, path cty.Path) error {
 			})
 		}
 	default:
-		result = multierror.Append(result, path.NewErrorf("list type is required, not %v", target.Kind()))
+		result = multierror.Append(result, ErrBadParameter.Withf("list type is required, not %v", target.Kind()))
 	}
 
-	path = path[:len(path)-1]
+	// Return success
 	return result
 }
 
-func fromCtyMap(val cty.Value, target reflect.Value, path cty.Path) error {
+func fromCtyMap(val cty.Value, target reflect.Value) error {
 	var result error
-	path = append(path, nil)
 
 	if target.Kind() != reflect.Map {
-		return path.NewErrorf("map type is required, not %v", target.Kind())
+		return ErrBadParameter.Withf("map type is required, not %v", target.Kind())
 	}
 
 	tv := reflect.MakeMap(target.Type())
 	et := target.Type().Elem()
-	path = append(path, nil)
 	if !val.ForEachElement(func(key, val cty.Value) bool {
-		path[len(path)-1] = cty.IndexStep{Key: key}
 
 		ks := key.AsString()
 		targetElem := reflect.New(et)
-		if err := fromCtyValue(val, targetElem, path); err != nil {
+		if err := fromCtyValue(val, targetElem); err != nil {
 			result = multierror.Append(result, err)
 			return true
 		} else {
@@ -245,16 +247,15 @@ func fromCtyMap(val cty.Value, target reflect.Value, path cty.Path) error {
 		target.Set(tv)
 	}
 
-	path = path[:len(path)-1]
+	// Return success
 	return result
 }
 
-func fromCtyObject(val cty.Value, target reflect.Value, path cty.Path) error {
+func fromCtyObject(val cty.Value, target reflect.Value) error {
 	var result error
-	path = append(path, nil)
 
 	if target.Kind() != reflect.Struct {
-		return path.NewErrorf("struct type is required, not %v", target.Kind())
+		return ErrBadParameter.Withf("struct type is required, not %v", target.Kind())
 	}
 
 	// Make zero-version of the target struct
@@ -262,15 +263,39 @@ func fromCtyObject(val cty.Value, target reflect.Value, path cty.Path) error {
 
 	// Set attributes
 	for key := range val.Type().AttributeTypes() {
-		path[len(path)-1] = cty.GetAttrStep{Name: key}
 		field := target.FieldByName(key)
 		if !field.IsValid() {
-			result = multierror.Append(result, path.NewErrorf("unsupported attribute %q", key))
-		} else if err := fromCtyValue(val.GetAttr(key), field, path); err != nil {
+			result = multierror.Append(result, ErrBadParameter.Withf("unsupported attribute %q", key))
+		} else if err := fromCtyValue(val.GetAttr(key), field); err != nil {
 			result = multierror.Append(result, err)
 		}
 	}
 
-	path = path[:len(path)-1]
+	// Return success
+	return result
+}
+
+func fromCtyTuple(val cty.Value, target reflect.Value) error {
+	var result error
+
+	if target.Kind() != reflect.Struct {
+		return ErrBadParameter.Withf("struct type is required, not %v", target.Kind())
+	}
+
+	elemTypes := val.Type().TupleElementTypes()
+	fieldCount := target.Type().NumField()
+	if fieldCount != len(elemTypes) {
+		return ErrBadParameter.Withf("a tuple of %d elements is required", fieldCount)
+	}
+
+	for i := range elemTypes {
+		ev := val.Index(cty.NumberIntVal(int64(i)))
+		targetField := target.Field(i)
+		if err := fromCtyValue(ev, targetField); err != nil {
+			result = multierror.Append(result, err)
+		}
+	}
+
+	// Return success
 	return result
 }

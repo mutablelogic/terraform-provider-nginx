@@ -78,11 +78,11 @@ func (r *refs) Context() *hcl.EvalContext {
 func (r *refs) objectValForName(name string) cty.Value {
 	values := r.references[name]
 	if values == nil {
-		return cty.DynamicVal
+		return cty.DynamicVal.Mark(name)
 	}
 	result := make(map[string]cty.Value)
 	for _, label := range values {
-		result[label] = cty.DynamicVal
+		result[label] = cty.DynamicVal.Mark(label)
 	}
 	return cty.ObjectVal(result)
 }

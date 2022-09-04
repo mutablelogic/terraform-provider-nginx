@@ -329,3 +329,29 @@ func Test_Cty_007(t *testing.T) {
 		})
 	}
 }
+
+func Test_Cty_008(t *testing.T) {
+	type varblock struct {
+		Label   string
+		Type    string
+		Default any
+	}
+
+	var tests = []struct {
+		In  cty.Value
+		Out varblock
+	}{
+		{cty.NilVal, varblock{}},
+		{cty.TupleVal([]cty.Value{cty.StringVal("label"), cty.StringVal("type"), cty.StringVal("default")}), varblock{Label: "label", Type: "type", Default: "default"}},
+	}
+	for i, test := range tests {
+		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			var out varblock
+			if err := FromCtyValue(test.In, &out); err != nil {
+				t.Error(err)
+			} else if reflect.DeepEqual(out, test.Out) != true {
+				t.Errorf("unexpected value returned: %v (expected %v)", out, test.Out)
+			}
+		})
+	}
+}

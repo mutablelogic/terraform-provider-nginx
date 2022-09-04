@@ -11,6 +11,10 @@ var "test" {
 
 router "main-router" {}
 
+httpserver "main-server" {
+    router = router.main-router
+}
+
 /*
 var "test" {
     type = "string"
