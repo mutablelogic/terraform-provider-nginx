@@ -7,6 +7,7 @@ import (
 	"os"
 	"regexp"
 	"sync"
+	"time"
 
 	// Import modules
 	multierror "github.com/hashicorp/go-multierror"
@@ -74,23 +75,54 @@ func (v KernelEvent) String() string {
 
 func (k *kernel) Run(ctx context.Context) error {
 	var result error
+	var counter sync.WaitGroup
 
 	// If there is no routertask, then quit
 	if k.RouterTask == nil {
 		return ErrNotFound.With("RouterTask")
 	}
 
-	// Run all the tasks in the background
+	// Run all the tasks in the background, except for the router
+	counter.Add(len(k.tasks) - 1)
 	for key, task := range k.tasks {
+		// Do not start the router task until all the other tasks are started
+		if task == k.RouterTask.(Task) {
+			continue
+		}
+
+		// Start other tasks in the background
+		k.wg.Add(1)
+		counter.Done()
+		go func(key string, task Task) {
+			defer k.wg.Done()
+			if err := k.startTask(ctx, key, task); err != nil {
+				result = multierror.Append(result, err)
+			}
+		}(key, task)
+	}
+
+	// Wait for all tasks (except router task) to have been started
+	time.Sleep(time.Second) // HACK
+	counter.Wait()
+
+	// If there are any errors, then return
+	if result != nil {
+		return result
+	}
+
+	// Start the router task
+	for key, task := range k.tasks {
+		// Do not start the router task until all the other tasks are started
+		if task != k.RouterTask.(Task) {
+			continue
+		}
+
+		// Start other tasks in the background
 		k.wg.Add(1)
 		go func(key string, task Task) {
 			defer k.wg.Done()
-			event.NewEvent(KernelEventStart, task).Emit(k.ch)
-			if err := task.Run(ctx, k); err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-				event.NewError(fmt.Errorf("%v: %w", key, err)).Emit(k.ch)
+			if err := k.startTask(ctx, key, task); err != nil {
 				result = multierror.Append(result, err)
-			} else {
-				event.NewEvent(KernelEventStop, key).Emit(k.ch)
 			}
 		}(key, task)
 	}
@@ -154,4 +186,20 @@ func (k *kernel) Get(key string) Task {
 
 func (k *kernel) C() <-chan Event {
 	return k.ch
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// PRIVATE METHODS
+
+func (k *kernel) startTask(ctx context.Context, key string, task Task) error {
+	// Start task and wait until done
+	event.NewEvent(KernelEventStart, task).Emit(k.ch)
+	if err := task.Run(ctx, k); err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+		event.NewError(fmt.Errorf("%v: %w", key, err)).Emit(k.ch)
+		return err
+	}
+
+	// Return success
+	event.NewEvent(KernelEventStop, key).Emit(k.ch)
+	return nil
 }

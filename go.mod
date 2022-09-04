@@ -7,6 +7,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/hcl/v2 v2.14.0
 	github.com/zclconf/go-cty v1.11.0
+	golang.org/x/exp v0.0.0-20220827204233-334a2380cb91
 )
 
 require (

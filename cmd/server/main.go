@@ -10,18 +10,17 @@ import (
 	"syscall"
 
 	// Moudule imports
-
-	server "github.com/mutablelogic/terraform-provider-nginx/pkg/httpserver"
+	provider "github.com/mutablelogic/terraform-provider-nginx/pkg/provider"
 )
 
 var (
-	flagAvailable = flag.String("available", "/etc/nginx/sites-available", "Path to the available sites")
-	flagEnabled   = flag.String("enabled", "/etc/nginx/sites-enabled", "Path to the enabled sites")
-	flagAddr      = flag.String("addr", ":8080", "Address to listen on")
+	flagAddr = flag.String("addr", ":8080", "Address to listen on")
 )
 
 func main() {
 	flag.Parse()
+
+	provider := provider.New()
 
 	// Create a new gateway
 	gateway, err := NewGateway(*flagAvailable, *flagEnabled)

@@ -9,31 +9,43 @@ import (
 ///////////////////////////////////////////////////////////////////////////////
 // INTERFACES
 
-// Kernel runs many tasks simultaneously
-type Kernel interface {
-	RouterTask
+// Provider runs many tasks simultaneously
+type Provider interface {
+	Task
 
-	// Run the kernel until cancel event
+	// Create a new task
+	New(ctx context.Context, config TaskPlugin) (Task, error)
+
+	// Return a task with the given label
+	TaskWithLabel(context.Context, string) Task
+
+	// Return tasks with the given name
+	TasksWithName(context.Context, string) []Task
+}
+
+// TaskPlugin provides methods to register a Task
+type TaskPlugin interface {
+	// Return the name of the task
+	Name() string
+
+	// Return a new task. Label for the task can be retrieved from context
+	New(context.Context, Provider) (Task, error)
+}
+
+// Task runs a single task, whilst emitting events
+type Task interface {
+	// Return unique label for the task
+	Label() string
+
+	// Run is called to start the task and block until context is cancelled
 	Run(context.Context) error
 
-	// Receive events
-	C() <-chan Event
-
-	// Add a Task to the kernel with a name
-	Add(string, Task) error
-
-	// Return a task with the given name
-	Get(string) Task
-}
-
-// Task has a Run function which is called when the task is started, and it continues
-// until context is cancelled. If can emit events to the channel.
-type Task interface {
-	Run(context.Context, Kernel) error
+	// C returns a channel on which events can be received, or returns nil
+	// if the task does not emit events
 	C() <-chan Event
 }
 
-// Event can emit events to a channel or can emit errors for logging
+// Event will emit key/value pairs or errors emited on a channel
 type Event interface {
 	Key() any
 	Value() any
@@ -43,8 +55,8 @@ type Event interface {
 	Emit(chan<- Event) bool
 }
 
-// RouterTask is a task which maps paths to routes
-type RouterTask interface {
+// Router is a task which maps paths to routes
+type Router interface {
 	// Add a prefix/path mapping to a handler for one or more HTTP methods
 	AddHandler(prefix string, path *regexp.Regexp, fn http.HandlerFunc, methods ...string) error
 

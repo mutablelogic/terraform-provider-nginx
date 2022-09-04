@@ -14,26 +14,31 @@ import (
 	fcgi "github.com/mutablelogic/terraform-provider-nginx/pkg/fcgi"
 
 	// Namespace imports
+	. "github.com/djthorpe/go-errors"
 	. "github.com/mutablelogic/terraform-provider-nginx"
 )
 
 ///////////////////////////////////////////////////////////////////////////////
 // TYPES
 
-type Config struct {
-	Addr    string        // Address or path for binding HTTP server
-	TLS     *TLS          // TLS parameters
-	Timeout time.Duration // Read timeout on HTTP requests
+type ServerConfig struct {
+	Label   string        `hcl:"label,label"`
+	Router  Task          `hcl:"router,optional"`
+	Addr    string        `hcl:"listen,optional"`  // Address or path for binding HTTP server
+	TLS     *TLS          `hcl:"tls,block"`        // TLS parameters
+	Timeout time.Duration `hcl:"timeout,optional"` // Read timeout on HTTP requests
 }
 
 type TLS struct {
-	Key  string // Path to TLS Private Key
-	Cert string // Path to TLS Certificate
+	Key  string `hcl:"key"`  // Path to TLS Private Key
+	Cert string `hcl:"cert"` // Path to TLS Certificate
 }
 
 type server struct {
-	srv  *http.Server
-	fcgi *fcgi.Server
+	Router
+	label string
+	srv   *http.Server
+	fcgi  *fcgi.Server
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -46,17 +51,51 @@ const (
 ///////////////////////////////////////////////////////////////////////////////
 // LIFECYCLE
 
-// Create the module
-func (cfg Config) New(handler http.Handler) (*server, error) {
+// Return name of the plugin
+func (cfg ServerConfig) Name() string {
+	return "httpserver"
+}
+
+// Return requires
+func (cfg ServerConfig) Requires() []string {
+	return []string{"router"}
+}
+
+// Create the server
+func (cfg ServerConfig) New(ctx context.Context, provider Provider) (Task, error) {
 	this := new(server)
 
-	if handler == nil {
-		handler = http.DefaultServeMux
+	// Set label
+	if cfg.Label == "" {
+		this.label = cfg.Name()
+	} else {
+		this.label = cfg.Label
+	}
+
+	// Obtain router
+	if cfg.Router == nil {
+		fmt.Println("Creating a new router since doesn't exist", cfg)
+		if router, err := provider.New(ctx, RouterConfig{
+			Label: this.label + "-router",
+		}); err != nil {
+			return nil, err
+		} else {
+			cfg.Router = router
+		}
+	}
+
+	// Check that router is a handler and a router
+	if _, ok := cfg.Router.(http.Handler); !ok {
+		return nil, ErrInternalAppError.With("invalid router")
+	} else if _, ok := cfg.Router.(Router); !ok {
+		return nil, ErrInternalAppError.With("invalid router")
+	} else {
+		this.Router = cfg.Router.(Router)
 	}
 
 	// Check addr for being (host, port). If not, then run as FCGI server
 	if _, _, err := net.SplitHostPort(cfg.Addr); cfg.Addr != "" && err != nil {
-		if err := this.fcgiserver(cfg.Addr, handler); err != nil {
+		if err := this.fcgiserver(cfg.Addr, cfg.Router.(http.Handler)); err != nil {
 			return nil, err
 		} else {
 			return this, nil
@@ -85,7 +124,7 @@ func (cfg Config) New(handler http.Handler) (*server, error) {
 	}
 
 	// Create net server
-	if err := this.netserver(cfg.Addr, tlsconfig, cfg.Timeout, handler); err != nil {
+	if err := this.netserver(cfg.Addr, tlsconfig, cfg.Timeout, cfg.Router.(http.Handler)); err != nil {
 		return nil, err
 	}
 
@@ -93,7 +132,7 @@ func (cfg Config) New(handler http.Handler) (*server, error) {
 	return this, nil
 }
 
-func (this *server) Run(ctx context.Context, _ Kernel) error {
+func (this *server) Run(ctx context.Context) error {
 	var result error
 	go func() {
 		<-ctx.Done()
@@ -112,6 +151,9 @@ func (this *server) Run(ctx context.Context, _ Kernel) error {
 
 func (this *server) String() string {
 	str := "<httpserver"
+	if this.label != "" {
+		str += fmt.Sprintf(" label=%q", this.label)
+	}
 	if this.fcgi != nil {
 		str += fmt.Sprintf(" fcgi=%q", this.fcgi.Addr)
 	} else {
@@ -123,6 +165,9 @@ func (this *server) String() string {
 			str += fmt.Sprintf(" read_timeout=%v", this.srv.ReadHeaderTimeout)
 		}
 	}
+	if this.Router != nil {
+		str += fmt.Sprintf(" router=%v", this.Router)
+	}
 	return str + ">"
 }
 
@@ -131,6 +176,10 @@ func (this *server) String() string {
 
 func (*server) C() <-chan Event {
 	return nil
+}
+
+func (s *server) Label() string {
+	return s.label
 }
 
 ///////////////////////////////////////////////////////////////////////////////

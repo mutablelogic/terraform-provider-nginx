@@ -17,10 +17,15 @@ import (
 /////////////////////////////////////////////////////////////////////
 // TYPES
 
+type RouterConfig struct {
+	Label string `hcl:"label,label"`
+}
+
 type middlewarefn func(http.HandlerFunc) http.HandlerFunc
 
 type router struct {
 	sync.RWMutex
+	label      string
 	routes     []route
 	cache      map[string]*cached
 	middleware map[string]middlewarefn
@@ -52,14 +57,38 @@ const (
 /////////////////////////////////////////////////////////////////////
 // LIFECYCLE
 
-func NewRouter() *router {
-	this := new(router)
-	this.cache = make(map[string]*cached)
-	this.middleware = make(map[string]middlewarefn)
-	return this
+// Return the name of the task
+func (cfg RouterConfig) Name() string {
+	return "router"
 }
 
-func (r *router) Run(ctx context.Context, _ Kernel) error {
+// Return requires
+func (cfg RouterConfig) Requires() []string {
+	return nil
+}
+
+// Return a new task. Label for the task can be retrieved from context
+func (cfg RouterConfig) New(context.Context, Provider) (Task, error) {
+	r := new(router)
+	r.cache = make(map[string]*cached)
+	r.middleware = make(map[string]middlewarefn)
+
+	// Set label
+	if cfg.Label == "" {
+		r.label = cfg.Name()
+	} else {
+		r.label = cfg.Label
+	}
+
+	// Return success
+	return r, nil
+}
+
+func (r *router) Label() string {
+	return r.label
+}
+
+func (r *router) Run(ctx context.Context) error {
 	<-ctx.Done()
 	return ctx.Err()
 }
@@ -69,6 +98,9 @@ func (r *router) Run(ctx context.Context, _ Kernel) error {
 
 func (r *router) String() string {
 	str := "<router"
+	if r.label != "" {
+		str += fmt.Sprintf(" label=%q", r.label)
+	}
 	for _, route := range r.routes {
 		str += fmt.Sprintf(" %q %q => %q", route.prefix, route.path, route.methods)
 	}
@@ -78,6 +110,10 @@ func (r *router) String() string {
 /////////////////////////////////////////////////////////////////////
 // PUBLIC METHODS
 
+// AddHandler adds a handler to the router, for a specific prefix and http methods supported.
+// If the path argument is nil, then any path under the prefix will match. If the path contains
+// a regular expression, then a match is made and any matched parameters of the regular
+// expression can be retrieved from the request context.
 func (r *router) AddHandler(prefix string, path *regexp.Regexp, fn http.HandlerFunc, methods ...string) error {
 	// If methods is empty, default to GET
 	if len(methods) == 0 {
@@ -102,34 +138,39 @@ func (r *router) AddHandler(prefix string, path *regexp.Regexp, fn http.HandlerF
 	return nil
 }
 
-func (r *router) AddMiddleware(name string, fn func(http.HandlerFunc) http.HandlerFunc) error {
+// AddMiddleware adds a middleware handler with a unique key.
+func (r *router) AddMiddleware(key string, fn func(http.HandlerFunc) http.HandlerFunc) error {
 	// Preconditions
-	if !reValidName.MatchString(name) {
-		return ErrBadParameter.Withf("AddMiddleWare: %q", name)
+	if !reValidName.MatchString(key) {
+		return ErrBadParameter.Withf("AddMiddleWare: %q", key)
 	}
 	if fn == nil {
-		return ErrBadParameter.Withf("AddMiddleWare: %q", name)
+		return ErrBadParameter.Withf("AddMiddleWare: %q", key)
 	}
 
 	// Check for duplicate entry
 	r.RLock()
-	_, exists := r.middleware[name]
+	_, exists := r.middleware[key]
 	r.RUnlock()
 	if exists {
-		return ErrDuplicateEntry.Withf("AddMiddleWare: %q", name)
+		return ErrDuplicateEntry.Withf("AddMiddleWare: %q", key)
 	}
 
 	// Set middleware mapping
 	r.Lock()
-	defer r.Unlock()
-	r.middleware[name] = fn
+	r.middleware[key] = fn
+	r.Unlock()
 
 	// Return success
 	return nil
 }
 
+// SetMiddleware binds an array of middleware functions to a prefix. The prefix should
+// already exist in the router.
 func (r *router) SetMiddleware(prefix string, chain ...string) error {
+	prefix = normalizePath(prefix, true)
 	fmt.Println("SetMiddleware", prefix, chain)
+
 	return nil
 }
 

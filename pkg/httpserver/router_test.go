@@ -1,6 +1,7 @@
 package httpserver_test
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -8,6 +9,10 @@ import (
 	"testing"
 
 	// Module import
+	"github.com/mutablelogic/terraform-provider-nginx/pkg/provider"
+
+	// Namespace imports
+	. "github.com/mutablelogic/terraform-provider-nginx"
 	. "github.com/mutablelogic/terraform-provider-nginx/pkg/httpserver"
 )
 
@@ -15,51 +20,67 @@ import (
 // TESTS
 
 func Test_Router_001(t *testing.T) {
+	// Create a provider, register http server and router
+	p := provider.New()
+	if err := p.Register(RouterConfig{}); err != nil {
+		t.Fatal(err)
+	}
+
 	// Create a router
-	router := NewRouter()
+	router, err := p.New(context.Background(), RouterConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if router == nil {
 		t.Fatal("Unexpected nil returned from NewRouter")
 	}
 }
 
 func Test_Router_002(t *testing.T) {
-	// Create a router
-	router := NewRouter()
-	if router == nil {
-		t.Fatal("Unexpected nil returned from NewRouter")
+	// Create a provider, register http server and router
+	p := provider.New()
+	if err := p.Register(RouterConfig{}); err != nil {
+		t.Fatal(err)
 	}
+
+	// Create a router
+	router, err := p.New(context.Background(), RouterConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Add a route for '/'
-	if err := router.AddHandler("/", nil, func(w http.ResponseWriter, r *http.Request) {
+	if err := router.(Router).AddHandler("/", nil, func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("/"))
 	}); err != nil {
 		t.Error(err)
 	}
 	// Add a route for '/A'
-	if err := router.AddHandler("/A", nil, func(w http.ResponseWriter, r *http.Request) {
+	if err := router.(Router).AddHandler("/A", nil, func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("/A"))
 	}); err != nil {
 		t.Error(err)
 	}
 	// Add a route for '/AA'
-	if err := router.AddHandler("/AA", nil, func(w http.ResponseWriter, r *http.Request) {
+	if err := router.(Router).AddHandler("/AA", nil, func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("/AA"))
 	}); err != nil {
 		t.Error(err)
 	}
 	// Add a route for '/' with regexp
-	if err := router.AddHandler("/", regexp.MustCompile("^/(test1)"), func(w http.ResponseWriter, r *http.Request) {
+	if err := router.(Router).AddHandler("/", regexp.MustCompile("^/(test1)"), func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("/test1"))
 	}); err != nil {
 		t.Error(err)
 	}
 	// Add a route for '/AA' with regexp
-	if err := router.AddHandler("/AA", regexp.MustCompile("^/(test2)"), func(w http.ResponseWriter, r *http.Request) {
+	if err := router.(Router).AddHandler("/AA", regexp.MustCompile("^/(test2)"), func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("/AA/test2"))
 	}); err != nil {
 		t.Error(err)
 	}
 	// Add a route for '/AA' with regexp
-	if err := router.AddHandler("/AA", regexp.MustCompile("^/(test3)"), func(w http.ResponseWriter, r *http.Request) {
+	if err := router.(Router).AddHandler("/AA", regexp.MustCompile("^/(test3)"), func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("/AA/test3"))
 	}); err != nil {
 		t.Error(err)
@@ -84,7 +105,7 @@ func Test_Router_002(t *testing.T) {
 
 	for i, test := range tests {
 		w := httptest.NewRecorder()
-		router.ServeHTTP(w, httptest.NewRequest(test.Method, test.Path, nil))
+		router.(http.Handler).ServeHTTP(w, httptest.NewRequest(test.Method, test.Path, nil))
 		if status := w.Result().StatusCode; status != test.Code {
 			t.Error("Test", i, ": unexpected status code: ", status)
 		} else if body, _ := io.ReadAll(w.Result().Body); test.Expected != "" && string(body) != test.Expected {
