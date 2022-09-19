@@ -90,6 +90,8 @@ func (p *provider) Run(ctx context.Context) error {
 	// Wait until all tasks are completed
 	wg.Wait()
 
+	// TODO: Close tasks in the reverse order they were created
+
 	// Return any errors
 	return result
 }
