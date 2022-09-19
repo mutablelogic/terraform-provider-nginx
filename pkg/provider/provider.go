@@ -2,7 +2,9 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"reflect"
 	"regexp"
 	"sync"
 
@@ -18,11 +20,14 @@ import (
 // TYPES
 
 type provider struct {
-	// Enumeration of task plugins, keyed by label
-	plugins map[string]TaskPlugin
+	// Enumeration of task plugins, keyed by name
+	plugins map[string]reflect.Type
 
 	// Enumeration of tasks, keyed by label
 	tasks map[string]task_
+
+	// Event channel
+	ch chan Event
 }
 
 type task_ struct {
@@ -47,8 +52,9 @@ var (
 
 func New() *provider {
 	p := new(provider)
-	p.plugins = make(map[string]TaskPlugin)
+	p.plugins = make(map[string]reflect.Type)
 	p.tasks = make(map[string]task_)
+	p.ch = make(chan Event)
 	return p
 }
 
@@ -68,20 +74,32 @@ func (p *provider) Run(ctx context.Context) error {
 	var wg sync.WaitGroup
 	var result error
 
-	// Create tasks
-	// TODO: These should be done in the right order
-	//for label, task := range p.tasks {
-	//	task, err := task.New()
-	//}
-
-	// TODO: Collect events
-
 	// Run all tasks
 	for label, task := range p.tasks {
-		wg.Add(1)
+		wg.Add(2)
+
+		// Emit events from task
+		go func(task Task) {
+			defer wg.Done()
+			ch := task.C()
+			if ch != nil {
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case event := <-ch:
+						if !event.Emit(p.ch) {
+							panic(fmt.Sprint("Unable to emit:", event))
+						}
+					}
+				}
+			}
+		}(task)
+
+		// Run task
 		go func(label string, task Task) {
 			defer wg.Done()
-			if err := task.Run(ctx); err != nil {
+			if err := task.Run(ctx); err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 				result = multierror.Append(result, fmt.Errorf("%v: %w", label, err))
 			}
 		}(label, task.Task)
@@ -91,6 +109,9 @@ func (p *provider) Run(ctx context.Context) error {
 	wg.Wait()
 
 	// TODO: Close tasks in the reverse order they were created
+
+	// Close channel
+	close(p.ch)
 
 	// Return any errors
 	return result
@@ -105,35 +126,29 @@ func (p *provider) String() string {
 	return str + ">"
 }
 
-/*
-// Register a task with the provider
-func (p *provider) Register(config TaskPlugin) error {
-	name := config.Name()
-	if !reTaskName.MatchString(name) {
-		return ErrBadParameter.With(name)
-	} else if _, exists := p.plugins[name]; exists {
-		return ErrDuplicateEntry.With(name)
-	} else {
-		p.plugins[name] = config
-	}
-
-	// Return success
-	return nil
-}
-*/
-
 // New creates a new task from a configuration with a unique label
 func (p *provider) New(ctx context.Context, config TaskPlugin) (Task, error) {
-	// Create the task
 	name := config.Name()
+
+	// Check the plugin by type
+	t := reflect.TypeOf(config)
+	if !reTaskName.MatchString(name) {
+		return nil, ErrBadParameter.Withf("Invalid name %q for plugin", name)
+	} else if t_, exists := p.plugins[name]; exists {
+		if t != t_ {
+			return nil, ErrDuplicateEntry.Withf("Plugin %q already exists", name)
+		}
+	} else {
+		p.plugins[name] = t
+	}
+
+	// Create a new task
 	task, err := config.New(ctx, p)
 	if err != nil {
 		return nil, err
-	}
-	if task == nil {
+	} else if task == nil {
 		return nil, ErrInternalAppError.Withf("Unexpected nil return when creating task %q ", name)
-	}
-	if label := task.Label(); !reTaskName.MatchString(label) {
+	} else if label := task.Label(); !reTaskName.MatchString(label) {
 		return nil, ErrBadParameter.Withf("Invalid label %q for task %q ", label, name)
 	} else if _, exists := p.tasks[label]; exists {
 		return nil, ErrDuplicateEntry.Withf("Task %q with label %q already exists", name, label)
@@ -145,18 +160,17 @@ func (p *provider) New(ctx context.Context, config TaskPlugin) (Task, error) {
 	return task, nil
 }
 
-// Return a task with the given label
-// TODO: if called within New then creates a dependency between tasks on Run
-func (p *provider) TaskWithLabel(ctx context.Context, label string) Task {
+// TaskWithLabel return a task with the given label or nil if not found
+func (p *provider) TaskWithLabel(label string) Task {
 	return p.tasks[label].Task
 }
 
-// Return tasks with the given name
-// TODO: if called within New then creates a dependency between tasks on Run
-func (p *provider) TasksWithName(ctx context.Context, name string) []Task {
+// TasksWithName returns a slice of tasks with the given name, or if name is empty
+// return all tasks
+func (p *provider) TasksWithName(name string) []Task {
 	result := []Task{}
 	for _, task := range p.tasks {
-		if name == task.name {
+		if name == task.name || name == "" {
 			result = append(result, task.Task)
 		}
 	}

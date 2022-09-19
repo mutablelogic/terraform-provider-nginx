@@ -10,7 +10,7 @@ import (
 	plugin "github.com/mutablelogic/terraform-provider-nginx/plugin"
 
 	// Namespace imports
-	. "github.com/mutablelogic/terraform-provider-nginx/plugin/tokenauth"
+	. "github.com/mutablelogic/terraform-provider-nginx/pkg/tokenauth"
 )
 
 func Test_TokenAuth_001(t *testing.T) {

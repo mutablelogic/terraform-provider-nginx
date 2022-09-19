@@ -52,7 +52,7 @@ func (c Config) New(ctx context.Context, provider Provider) (Task, error) {
 	if c.File == "" {
 		c.File = defaultFile
 	}
-	if c.Delta < 0 {
+	if c.Delta <= 0 {
 		c.Delta = defaultDelta
 	}
 
