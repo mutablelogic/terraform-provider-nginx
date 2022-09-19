@@ -15,8 +15,8 @@ import (
 
 type Config struct {
 	Label  string `json:"label,omitempty"`
-	Auth   Task   `json:"-"`
-	Server Task   `json:"-"`
+	Auth   Task   `json:"-"` // plugin.TokenAuth
+	Router Task   `json:"-"` // plugin.Router
 }
 
 /////////////////////////////////////////////////////////////////////
