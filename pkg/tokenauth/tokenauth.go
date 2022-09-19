@@ -1,15 +1,12 @@
-// tokenauth package manages the authentication tokens
 package tokenauth
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sync"
 	"time"
 
@@ -24,15 +21,10 @@ import (
 /////////////////////////////////////////////////////////////////////
 // TYPES
 
-type Config struct {
-	Path  string
-	File  string
-	Delta time.Duration
-}
-
 type auth struct {
 	sync.RWMutex
 
+	label    string
 	delta    time.Duration
 	path     string
 	tokens   map[string]*token
@@ -40,47 +32,20 @@ type auth struct {
 	ch       chan Event
 }
 
-type token struct {
-	Token string    `json:"token"`
-	Time  time.Time `json:"atime"`
-}
-
-/////////////////////////////////////////////////////////////////////
-// GLOBALS
-
-const (
-	defaultFile                 = "tokenauth.json"
-	defaultLength               = 32
-	defaultDelta                = time.Second * 30
-	defaultEventChannelCapacity = 1000
-)
-
-const (
-	AdminToken = "admin"
-)
-
-var (
-	reValidName = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_\-]+$`)
-)
-
 /////////////////////////////////////////////////////////////////////
 // LIFECYCLE
 
-func (c Config) New() (*auth, error) {
+func NewWithConfig(c Config) (*auth, error) {
 	this := new(auth)
 	this.ch = make(chan Event, defaultEventChannelCapacity)
-	this.delta = defaultDelta
+	this.delta = c.Delta
+	this.label = c.Label
 
 	// Check for path
 	if stat, err := os.Stat(c.Path); err != nil {
 		return nil, err
 	} else if !stat.IsDir() {
 		return nil, ErrBadParameter.Withf("not a directory: %q", c.Path)
-	}
-
-	// Check for filename
-	if c.File == "" {
-		c.File = defaultFile
 	}
 
 	// Set filename
@@ -108,41 +73,16 @@ func (c Config) New() (*auth, error) {
 		return nil, err
 	}
 
-	// Set delta
-	if c.Delta != 0 {
-		this.delta = c.Delta
-	}
-
 	// Return success
 	return this, nil
-}
-
-// Run will write the authorization tokens back to disk if they have been modified
-func (c *auth) Run(ctx context.Context, _ Kernel) error {
-	ticker := time.NewTicker(c.delta)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			close(c.ch)
-			_, err := c.writeIfModified()
-			return err
-		case <-ticker.C:
-			if written, err := c.writeIfModified(); err != nil {
-				event.NewError(err).Emit(c.ch)
-			} else if written {
-				event.NewEvent(nil, "Written tokens to disk").Emit(c.ch)
-			}
-		}
-	}
 }
 
 /////////////////////////////////////////////////////////////////////
 // STRINGIFY
 
 func (c *auth) String() string {
-	str := "<auth"
+	str := "<tokenauth"
+	str += fmt.Sprintf(" label=%q", c.label)
 	str += fmt.Sprintf(" path=%q", c.path)
 	for k, v := range c.tokens {
 		str += fmt.Sprintf(" %v=%v", k, v)
@@ -151,20 +91,8 @@ func (c *auth) String() string {
 	return str + ">"
 }
 
-func (t *token) String() string {
-	str := "<token"
-	str += fmt.Sprintf(" token=%q", t.Token)
-	str += fmt.Sprintf("  last_accessed=%q", t.Time.Format(time.RFC3339))
-	return str + ">"
-}
-
 /////////////////////////////////////////////////////////////////////
 // PUBLIC METHODS
-
-// Return event channel
-func (c *auth) C() <-chan Event {
-	return c.ch
-}
 
 // Return true if a token associated with the name already exists
 func (c *auth) Exists(name string) bool {

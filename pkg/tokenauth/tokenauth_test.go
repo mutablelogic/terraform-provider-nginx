@@ -6,14 +6,14 @@ import (
 	"testing"
 	"time"
 
-	// Module import
-	. "github.com/mutablelogic/terraform-provider-nginx/pkg/tokenauth"
+	// Module imports
+	plugin "github.com/mutablelogic/terraform-provider-nginx/plugin"
+
+	// Namespace imports
+	. "github.com/mutablelogic/terraform-provider-nginx/plugin/tokenauth"
 )
 
-/////////////////////////////////////////////////////////////////////
-// TESTS
-
-func Test_Auth_001(t *testing.T) {
+func Test_TokenAuth_001(t *testing.T) {
 	// Create an "tokens" folder
 	path, err := os.MkdirTemp("", t.Name())
 	if err != nil {
@@ -21,16 +21,16 @@ func Test_Auth_001(t *testing.T) {
 	}
 	defer os.RemoveAll(path)
 
-	// Create a configuration
-	auth, err := Config{Path: path}.New()
+	task, err := Config{
+		Path: path,
+	}.New(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	t.Log(auth)
+	t.Log(task)
 }
 
-func Test_Auth_002(t *testing.T) {
+func Test_TokenAuth_002(t *testing.T) {
 	// Create an "tokens" folder
 	path, err := os.MkdirTemp("", t.Name())
 	if err != nil {
@@ -39,7 +39,7 @@ func Test_Auth_002(t *testing.T) {
 	defer os.RemoveAll(path)
 
 	// Create a configuration
-	auth, err := Config{Path: path, Delta: time.Second}.New()
+	auth, err := Config{Path: path, Delta: time.Second}.New(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,26 +51,26 @@ func Test_Auth_002(t *testing.T) {
 		}
 	}()
 
-	// Revoke the admin token once to rotate it
+	// Revoke the admin token to rotate it, three times
 	go func() {
 		for i := 0; i < 3; i++ {
 			time.Sleep(time.Second)
 			t.Log("Revoke admin token")
-			if err := auth.Revoke(AdminToken); err != nil {
+			if err := auth.(plugin.TokenAuth).Revoke(AdminToken); err != nil {
 				t.Error(err)
 			}
 		}
 	}()
 
 	// Run in foreground for a few seconds
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	if err := auth.Run(ctx, nil); err != nil {
+	if err := auth.Run(ctx); err != nil {
 		t.Error(err)
 	}
 }
 
-func Test_Auth_003(t *testing.T) {
+func Test_TokenAuth_003(t *testing.T) {
 	// Create an "tokens" folder
 	path, err := os.MkdirTemp("", t.Name())
 	if err != nil {
@@ -79,7 +79,7 @@ func Test_Auth_003(t *testing.T) {
 	defer os.RemoveAll(path)
 
 	// Create a configuration
-	auth, err := Config{Path: path, Delta: time.Second}.New()
+	auth, err := Config{Path: path, Delta: time.Millisecond * 100}.New(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +93,7 @@ func Test_Auth_003(t *testing.T) {
 
 	// Create and then revoke a token
 	go func() {
-		value, err := auth.Create("test")
+		value, err := auth.(plugin.TokenAuth).Create("test")
 		if err != nil {
 			t.Error(err)
 		} else {
@@ -101,18 +101,18 @@ func Test_Auth_003(t *testing.T) {
 		}
 		time.Sleep(2 * time.Second)
 		t.Log("Testing test token value for match")
-		if matches := auth.Matches(value); matches != "test" {
+		if matches := auth.(plugin.TokenAuth).Matches(value); matches != "test" {
 			t.Error("Expected token to be 'test'")
 		}
 		time.Sleep(2 * time.Second)
 		t.Log("Revoking test token")
-		if err := auth.Revoke("test"); err != nil {
+		if err := auth.(plugin.TokenAuth).Revoke("test"); err != nil {
 			t.Error(err)
 		} else {
 			t.Log("Revoked token=", value)
 		}
 		time.Sleep(2 * time.Second)
-		if matches := auth.Matches(value); matches != "" {
+		if matches := auth.(plugin.TokenAuth).Matches(value); matches != "" {
 			t.Error("Expected token to be empty")
 		}
 	}()
@@ -120,7 +120,7 @@ func Test_Auth_003(t *testing.T) {
 	// Run in foreground for a few seconds
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
-	if err := auth.Run(ctx, nil); err != nil {
+	if err := auth.Run(ctx); err != nil {
 		t.Error(err)
 	}
 }

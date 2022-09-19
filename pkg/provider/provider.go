@@ -2,10 +2,12 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"regexp"
+	"sync"
 
 	// Module imports
-	environment "github.com/mutablelogic/terraform-provider-nginx/pkg/context"
+	"github.com/hashicorp/go-multierror"
 
 	// Namespace imports
 	. "github.com/djthorpe/go-errors"
@@ -16,18 +18,21 @@ import (
 // TYPES
 
 type provider struct {
-	// Enumeration of task plugins
+	// Enumeration of task plugins, keyed by label
 	plugins map[string]TaskPlugin
 
-	// Enumeration of tasks
+	// Enumeration of tasks, keyed by label
 	tasks map[string]task_
 }
 
 type task_ struct {
 	Task
 
-	// Name of the task
+	// Name of task (not necessarily unique)
 	name string
+
+	// Label of the task (unique)
+	label string
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -47,13 +52,46 @@ func New() *provider {
 	return p
 }
 
-func (p *provider) Run(ctx context.Context) error {
-	// Call new function on each task
+///////////////////////////////////////////////////////////////////////////////
+// PUBLIC FUNCTIONS - TASK
+
+// Return channels for events
+func (p *provider) C() <-chan Event {
 	return nil
 }
 
 func (p *provider) Label() string {
-	return ""
+	return "provider"
+}
+
+func (p *provider) Run(ctx context.Context) error {
+	var wg sync.WaitGroup
+	var result error
+
+	// Create tasks
+	// TODO: These should be done in the right order
+	//for label, task := range p.tasks {
+	//	task, err := task.New()
+	//}
+
+	// TODO: Collect events
+
+	// Run all tasks
+	for label, task := range p.tasks {
+		wg.Add(1)
+		go func(label string, task Task) {
+			defer wg.Done()
+			if err := task.Run(ctx); err != nil {
+				result = multierror.Append(result, fmt.Errorf("%v: %w", label, err))
+			}
+		}(label, task.Task)
+	}
+
+	// Wait until all tasks are completed
+	wg.Wait()
+
+	// Return any errors
+	return result
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -61,12 +99,11 @@ func (p *provider) Label() string {
 
 func (p *provider) String() string {
 	str := "<provider"
+	str += fmt.Sprintf(" label=%q", p.Label())
 	return str + ">"
 }
 
-///////////////////////////////////////////////////////////////////////////////
-// PUBLIC FUNCTIONS
-
+/*
 // Register a task with the provider
 func (p *provider) Register(config TaskPlugin) error {
 	name := config.Name()
@@ -81,22 +118,25 @@ func (p *provider) Register(config TaskPlugin) error {
 	// Return success
 	return nil
 }
+*/
 
 // New creates a new task from a configuration with a unique label
 func (p *provider) New(ctx context.Context, config TaskPlugin) (Task, error) {
 	// Create the task
 	name := config.Name()
-	task, err := config.New(environment.WithName(ctx, name), p)
+	task, err := config.New(ctx, p)
 	if err != nil {
 		return nil, err
-	} else if task == nil {
+	}
+	if task == nil {
 		return nil, ErrInternalAppError.Withf("Unexpected nil return when creating task %q ", name)
-	} else if label := task.Label(); !reTaskName.MatchString(label) {
+	}
+	if label := task.Label(); !reTaskName.MatchString(label) {
 		return nil, ErrBadParameter.Withf("Invalid label %q for task %q ", label, name)
 	} else if _, exists := p.tasks[label]; exists {
 		return nil, ErrDuplicateEntry.Withf("Task %q with label %q already exists", name, label)
 	} else {
-		p.tasks[label] = task_{task, name}
+		p.tasks[label] = task_{task, name, label}
 	}
 
 	// Return success
@@ -119,9 +159,4 @@ func (p *provider) TasksWithName(ctx context.Context, name string) []Task {
 		}
 	}
 	return result
-}
-
-// Return channels for events
-func (p *provider) C() <-chan Event {
-	return nil
 }

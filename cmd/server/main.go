@@ -8,9 +8,11 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	// Moudule imports
 	provider "github.com/mutablelogic/terraform-provider-nginx/pkg/provider"
+	tokenauth "github.com/mutablelogic/terraform-provider-nginx/pkg/tokenauth"
 )
 
 var (
@@ -21,17 +23,10 @@ func main() {
 	flag.Parse()
 
 	provider := provider.New()
+	ctx := HandleSignal()
 
-	// Create a new gateway
-	gateway, err := NewGateway(*flagAvailable, *flagEnabled)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-
-	// Create a server and a router
-	server, err := server.Config{Addr: *flagAddr, Router: gateway}.New()
-	if err != nil {
+	// Built-in tokenauth
+	if _, err := provider.New(ctx, tokenauth.Config{Delta: time.Second}); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -43,16 +38,7 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if err := gateway.Run(HandleSignal()); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(-1)
-		}
-	}()
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if err := server.Run(HandleSignal()); err != nil {
+		if err := provider.Run(HandleSignal()); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(-1)
 		}
