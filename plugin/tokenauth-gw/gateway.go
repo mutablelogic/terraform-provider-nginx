@@ -21,10 +21,10 @@ type gateway struct {
 /////////////////////////////////////////////////////////////////////
 // LIFECYCLE
 
-func NewWithConfig(c Config, t plugin.TokenAuth) (Task, error) {
+func NewWithConfig(c Config) (Task, error) {
 	this := new(gateway)
 	this.label = c.Label
-	this.TokenAuth = t
+	this.TokenAuth = c.Auth
 
 	// Return success
 	return this, nil
