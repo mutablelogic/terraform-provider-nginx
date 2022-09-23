@@ -9,9 +9,14 @@ import (
 )
 
 func (plugin *gateway) CreateHandler(w http.ResponseWriter, r *http.Request) {
+	admin := context.ReqAdmin(r)
 	params := context.ReqParams(r)
 	if len(params) != 1 {
 		util.ServeError(w, http.StatusBadRequest)
+		return
+	}
+	if !admin {
+		util.ServeError(w, http.StatusUnauthorized)
 		return
 	}
 

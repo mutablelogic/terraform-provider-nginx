@@ -2,9 +2,13 @@ package router
 
 import (
 	"net/http"
+	"sort"
 
 	// Namespace imports
 	. "github.com/djthorpe/go-errors"
+
+	// Module imports
+	"github.com/mutablelogic/terraform-provider-nginx/pkg/util"
 	//. "github.com/mutablelogic/terraform-provider-nginx/plugin"
 )
 
@@ -12,6 +16,7 @@ import (
 // TYPES
 
 type middleware struct {
+	handlers map[string]func(http.HandlerFunc) http.HandlerFunc
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -21,8 +26,28 @@ type middleware struct {
 // If the path argument is nil, then any path under the prefix will match. If the path contains
 // a regular expression, then a match is made and any matched parameters of the regular
 // expression can be retrieved from the request context.
-func (r *router) AddMiddleware(name string, fn func(http.Handler) http.Handler) error {
-	return ErrNotImplemented.With(name)
+func (m *middleware) AddMiddleware(name string, fn func(http.HandlerFunc) http.HandlerFunc) error {
+	if !util.IsIdentifier(name) || fn == nil {
+		return ErrBadParameter.With(name)
+	}
+	if m.handlers == nil {
+		m.handlers = make(map[string]func(http.HandlerFunc) http.HandlerFunc)
+	}
+
+	return ErrNotImplemented.With("middleware: ", name)
+}
+
+// Wrap a handler with middleware, called from right to left
+func (m *middleware) Wrap(fn http.HandlerFunc, middleware ...string) (http.HandlerFunc, error) {
+	sort.Reverse(sort.StringSlice(middleware))
+	for _, name := range middleware {
+		if wrapped, ok := m.handlers[name]; ok {
+			fn = wrapped(fn)
+		} else {
+			return nil, ErrNotFound.With("middleware: ", name)
+		}
+	}
+	return fn, nil
 }
 
 /*

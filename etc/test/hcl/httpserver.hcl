@@ -5,23 +5,17 @@ var "listener" {
     default = ":80"
 }
 
-var "test" {
-    type = "string"
+httpserver "server" {
+    listen = var.listener
 }
 
-router "main-router" {}
-
-httpserver "main-server" {
-    router = router.main-router
+tokenauth-gateway "tokenauth" {
+    router = httpserver.server
+    prefix = "/api/tokenauth/v1"
 }
 
-/*
-var "test" {
-    type = "string"
-    description = "Which port server listens on"
-    default = ":80"
+nginx-gateway "nginx" {
+    router = httpserver.server
+    prefix = "/api/nginx/v1"
+    middleware = [ "tokenauth" ]
 }
-
-router "test-router" {}
-
-*/

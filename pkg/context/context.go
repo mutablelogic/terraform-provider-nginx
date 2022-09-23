@@ -21,6 +21,7 @@ const (
 	contextLabel
 	contextPrefix
 	contextParams
+	contextAdmin
 )
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -38,6 +39,10 @@ func WithNameLabel(ctx context.Context, name, label string) context.Context {
 	return context.WithValue(context.WithValue(ctx, contextName, name), contextLabel, label)
 }
 
+func WithAdmin(ctx context.Context, admin bool) context.Context {
+	return context.WithValue(ctx, contextAdmin, admin)
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // RETURN VALUES FROM CONTEXT
 
@@ -49,6 +54,10 @@ func Label(ctx context.Context) string {
 	return contextString(ctx, contextLabel)
 }
 
+func Admin(ctx context.Context) bool {
+	return contextBool(ctx, contextAdmin)
+}
+
 func ReqParams(req *http.Request) []string {
 	if value, ok := req.Context().Value(contextParams).([]string); ok {
 		return value
@@ -58,11 +67,15 @@ func ReqParams(req *http.Request) []string {
 }
 
 func ReqPrefix(req *http.Request) string {
-	if value, ok := req.Context().Value(contextPrefix).(string); ok {
-		return value
-	} else {
-		return ""
-	}
+	return contextString(req.Context(), contextPrefix)
+}
+
+func ReqName(req *http.Request) string {
+	return contextString(req.Context(), contextName)
+}
+
+func ReqAdmin(req *http.Request) bool {
+	return contextBool(req.Context(), contextAdmin)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -82,6 +95,9 @@ func DumpContext(ctx context.Context, w io.Writer) {
 	if value, ok := ctx.Value(contextParams).([]string); ok {
 		fmt.Fprintf(w, " params=%q", value)
 	}
+	if value, ok := ctx.Value(contextBool).(bool); ok {
+		fmt.Fprintf(w, " admin=%v", value)
+	}
 	fmt.Fprintf(w, ">")
 }
 
@@ -93,5 +109,13 @@ func contextString(ctx context.Context, key contextType) string {
 		return value
 	} else {
 		return ""
+	}
+}
+
+func contextBool(ctx context.Context, key contextType) bool {
+	if value, ok := ctx.Value(key).(bool); ok {
+		return value
+	} else {
+		return false
 	}
 }
