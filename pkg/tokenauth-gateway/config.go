@@ -28,10 +28,11 @@ type Config struct {
 // GLOBALS
 
 const (
-	DefaultLabelSuffix = "-gw"
-	DefaultPathSuffix  = "/v1"
-	DefaultLabel       = tokenauth.DefaultLabel + DefaultLabelSuffix
-	MiddlewareName     = tokenauth.DefaultLabel
+	DefaultLabelSuffix  = "-gw"
+	DefaultPathSuffix   = "/v1"
+	DefaultLabel        = tokenauth.DefaultLabel + DefaultLabelSuffix
+	MiddlewareName      = tokenauth.DefaultLabel
+	MiddlewareAdminName = tokenauth.DefaultLabel + "-admin"
 )
 
 /////////////////////////////////////////////////////////////////////

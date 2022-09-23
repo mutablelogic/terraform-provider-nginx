@@ -14,11 +14,8 @@ type Router interface {
 	http.Handler
 
 	// Add a prefix/path mapping to a handler for one or more HTTP methods
-	AddHandler(prefix string, path *regexp.Regexp, fn http.HandlerFunc, methods ...string) error
+	AddHandler(Gateway, *regexp.Regexp, http.HandlerFunc, ...string) error
 
-	// Add middleware handler to the router
-	AddMiddleware(name string, fn func(http.HandlerFunc) http.HandlerFunc) error
-
-	// Set middleware for a prefix. Called from left to right.
-	//SetMiddleware(prefix string, chain ...string) error
+	// Add middleware handler to the router given unique name
+	AddMiddleware(string, func(http.HandlerFunc) http.HandlerFunc) error
 }

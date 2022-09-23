@@ -19,6 +19,7 @@ import (
 type gateway struct {
 	TokenAuth
 	label, prefix string
+	middleware    []string
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -40,6 +41,9 @@ func NewWithConfig(c Config) (Task, error) {
 
 	// Register middleware
 	if err := c.Router.(Router).AddMiddleware(MiddlewareName, plugin.AuthenticateHandler); err != nil {
+		return nil, err
+	}
+	if err := c.Router.(Router).AddMiddleware(MiddlewareAdminName, plugin.AuthenticateAdminHandler); err != nil {
 		return nil, err
 	}
 
@@ -73,4 +77,8 @@ func (plugin *gateway) String() string {
 
 func (plugin *gateway) Prefix() string {
 	return plugin.prefix
+}
+
+func (plugin *gateway) Middleware() []string {
+	return plugin.middleware
 }

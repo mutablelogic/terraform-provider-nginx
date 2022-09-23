@@ -11,4 +11,7 @@ type Gateway interface {
 
 	// Return the prefix for this gateway
 	Prefix() string
+
+	// Return the middleware, called from left to right, then right to left
+	Middleware() []string
 }
