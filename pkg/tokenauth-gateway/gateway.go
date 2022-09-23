@@ -38,7 +38,12 @@ func NewWithConfig(c Config) (Task, error) {
 	plugin.prefix = c.Prefix
 	plugin.TokenAuth = c.Auth.(TokenAuth)
 
-	// Register routes
+	// Register middleware
+	if err := c.Router.(Router).AddMiddleware(MiddlewareName, plugin.AuthenticateHandler); err != nil {
+		return nil, err
+	}
+
+	// Register handlers
 	if err := c.Router.(Router).AddHandler(c.Prefix, rePathList, plugin.ListHandler, http.MethodGet); err != nil {
 		return nil, err
 	}

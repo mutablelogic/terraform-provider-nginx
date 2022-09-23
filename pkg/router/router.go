@@ -11,6 +11,7 @@ import (
 	// Module imports
 	context "github.com/mutablelogic/terraform-provider-nginx/pkg/context"
 	util "github.com/mutablelogic/terraform-provider-nginx/pkg/util"
+	"golang.org/x/exp/slices"
 
 	// Namespace imports
 	//. "github.com/djthorpe/go-errors"
@@ -24,10 +25,10 @@ type middlewarefn func(http.HandlerFunc) http.HandlerFunc
 
 type router struct {
 	sync.RWMutex
-	label      string
-	routes     []route
-	cache      map[string]*cached
-	middleware map[string]middlewarefn
+	label  string
+	routes []route
+	cache  map[string]*cached
+	middleware
 }
 
 type cached struct {
@@ -47,9 +48,8 @@ type route struct {
 
 func NewWithConfig(c Config) (Router, error) {
 	r := new(router)
-	r.cache = make(map[string]*cached)
-	r.middleware = make(map[string]middlewarefn)
 	r.label = c.Label
+	r.cache = make(map[string]*cached)
 
 	// Return success
 	return r, nil
@@ -201,10 +201,5 @@ func normalizePath(path string, end bool) string {
 
 // contains returns true if a string array contains a string
 func contains(a []string, s string) bool {
-	for _, v := range a {
-		if v == s {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(a, s)
 }

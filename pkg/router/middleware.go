@@ -1,5 +1,30 @@
 package router
 
+import (
+	"net/http"
+
+	// Namespace imports
+	. "github.com/djthorpe/go-errors"
+	//. "github.com/mutablelogic/terraform-provider-nginx/plugin"
+)
+
+/////////////////////////////////////////////////////////////////////
+// TYPES
+
+type middleware struct {
+}
+
+/////////////////////////////////////////////////////////////////////
+// PUBLIC METHODS
+
+// AddHandler adds a handler to the router, for a specific prefix and http methods supported.
+// If the path argument is nil, then any path under the prefix will match. If the path contains
+// a regular expression, then a match is made and any matched parameters of the regular
+// expression can be retrieved from the request context.
+func (r *router) AddMiddleware(name string, fn func(http.Handler) http.Handler) error {
+	return ErrNotImplemented.With(name)
+}
+
 /*
 
 // AddMiddleware adds a middleware handler with a unique key.
