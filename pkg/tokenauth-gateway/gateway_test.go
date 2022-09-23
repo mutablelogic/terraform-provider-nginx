@@ -76,12 +76,40 @@ func Test_TokenAuthGateway_002(t *testing.T) {
 	}
 
 	// Check /list method
-	w := httptest.NewRecorder()
-	router.(http.Handler).ServeHTTP(w, httptest.NewRequest(http.MethodGet, gateway.(Gateway).Prefix()+"/", nil))
-	if status := w.Result().StatusCode; status != http.StatusOK {
-		t.Error("unexpected status code: ", status)
-	} else {
-		body, _ := io.ReadAll(w.Result().Body)
-		t.Log(string(body))
-	}
+	t.Run("List", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		router.(http.Handler).ServeHTTP(w, httptest.NewRequest(http.MethodGet, gateway.(Gateway).Prefix()+"/", nil))
+		if status := w.Result().StatusCode; status != http.StatusOK {
+			t.Error("unexpected status code: ", status)
+		} else {
+			body, _ := io.ReadAll(w.Result().Body)
+			t.Log(string(body))
+		}
+	})
+
+	t.Run("Create", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		name := "token"
+		router.(http.Handler).ServeHTTP(w, httptest.NewRequest(http.MethodPost, gateway.(Gateway).Prefix()+"/"+name, nil))
+		if status := w.Result().StatusCode; status != http.StatusCreated {
+			t.Error("unexpected status code: ", status)
+			body, _ := io.ReadAll(w.Result().Body)
+			t.Log(string(body))
+		} else {
+			body, _ := io.ReadAll(w.Result().Body)
+			t.Log(string(body))
+		}
+	})
+
+	t.Run("Revoke", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		name := "admin"
+		router.(http.Handler).ServeHTTP(w, httptest.NewRequest(http.MethodDelete, gateway.(Gateway).Prefix()+"/"+name, nil))
+		if status := w.Result().StatusCode; status != http.StatusOK {
+			t.Error("unexpected status code: ", status)
+		} else {
+			body, _ := io.ReadAll(w.Result().Body)
+			t.Log(string(body))
+		}
+	})
 }

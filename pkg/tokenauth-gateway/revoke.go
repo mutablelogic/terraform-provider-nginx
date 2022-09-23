@@ -8,7 +8,7 @@ import (
 	util "github.com/mutablelogic/terraform-provider-nginx/pkg/util"
 )
 
-func (plugin *gateway) CreateHandler(w http.ResponseWriter, r *http.Request) {
+func (plugin *gateway) RevokeHandler(w http.ResponseWriter, r *http.Request) {
 	params := context.ReqParams(r)
 	if len(params) != 1 {
 		util.ServeError(w, http.StatusBadRequest)
@@ -16,11 +16,12 @@ func (plugin *gateway) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	name := params[0]
-	if plugin.Exists(name) {
-		util.ServeError(w, http.StatusBadRequest)
-	} else if value, err := plugin.Create(name); err != nil {
+	if !plugin.Exists(name) {
+		util.ServeError(w, http.StatusNotFound)
+	} else if err := plugin.Revoke(name); err != nil {
 		util.ServeError(w, http.StatusInternalServerError, err.Error())
 	} else {
-		util.ServeJSON(w, value, http.StatusCreated, 2)
+		// Serve emoty page
+		util.ServeEmpty(w, http.StatusOK)
 	}
 }

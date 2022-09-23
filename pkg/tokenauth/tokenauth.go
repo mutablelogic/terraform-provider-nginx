@@ -28,7 +28,7 @@ type auth struct {
 	label    string
 	delta    time.Duration
 	path     string
-	tokens   map[string]*token
+	tokens   map[string]*Token
 	modified bool
 	ch       chan Event
 }
@@ -129,7 +129,7 @@ func (c *auth) Create(name string) (string, error) {
 	c.setModified(true)
 
 	// Success: return the token value
-	return c.tokens[name].Token, nil
+	return c.tokens[name].Value, nil
 }
 
 // Revoke a token associated with a name. For the admin token, it is
@@ -193,7 +193,7 @@ func (c *auth) Matches(value string) string {
 	defer c.Unlock()
 
 	for k, v := range c.tokens {
-		if v.Token == value {
+		if v.Value == value {
 			v.Time = time.Now()
 			c.setModified(true)
 			return k
@@ -230,8 +230,8 @@ func (c *auth) writeIfModified() (bool, error) {
 	return modified, nil
 }
 
-func fileRead(filename string) (map[string]*token, error) {
-	var result = map[string]*token{}
+func fileRead(filename string) (map[string]*Token, error) {
+	var result = map[string]*Token{}
 
 	// If the file doesn't exist, return empty result
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
@@ -256,7 +256,7 @@ func fileRead(filename string) (map[string]*token, error) {
 	return result, nil
 }
 
-func fileWrite(filename string, tokens map[string]*token) error {
+func fileWrite(filename string, tokens map[string]*Token) error {
 	if tokens == nil {
 		return ErrBadParameter.Withf("tokens is nil")
 	}
@@ -277,9 +277,9 @@ func fileWrite(filename string, tokens map[string]*token) error {
 	return nil
 }
 
-func newToken(length int) *token {
-	return &token{
-		Token: generateToken(length),
+func newToken(length int) *Token {
+	return &Token{
+		Value: generateToken(length),
 		Time:  time.Now(),
 	}
 }

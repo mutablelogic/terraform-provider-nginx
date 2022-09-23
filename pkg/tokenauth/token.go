@@ -8,17 +8,17 @@ import (
 /////////////////////////////////////////////////////////////////////
 // TYPES
 
-type token struct {
-	Token string    `json:"token"`
-	Time  time.Time `json:"atime"`
+type Token struct {
+	Value string    `json:"token,omitempty"`
+	Time  time.Time `json:"access_time"`
 }
 
 /////////////////////////////////////////////////////////////////////
 // STRINGIFY
 
-func (t *token) String() string {
+func (t *Token) String() string {
 	str := "<tokenauth-token"
-	str += fmt.Sprintf(" token=%q", t.Token)
-	str += fmt.Sprintf(" last_accessed=%q", t.Time.Format(time.RFC3339))
+	str += fmt.Sprintf(" token=%q", t.Value)
+	str += fmt.Sprintf(" access_time=%q", t.Time.Format(time.RFC3339))
 	return str + ">"
 }

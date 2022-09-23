@@ -9,6 +9,7 @@ import (
 	. "github.com/mutablelogic/terraform-provider-nginx"
 
 	// Module imports
+	"github.com/mutablelogic/terraform-provider-nginx/pkg/router"
 	util "github.com/mutablelogic/terraform-provider-nginx/pkg/util"
 )
 
@@ -49,9 +50,23 @@ func (c Config) New(ctx context.Context, provider Provider) (Task, error) {
 	if c.Label == "" {
 		c.Label = DefaultLabel
 	}
+	// Set timeout
+	if c.Timeout == 0 {
+		c.Timeout = DefaultTimeout
+	}
 	// Check label
-	if !util.IsIdentifier(c.Label) == false {
+	if !util.IsIdentifier(c.Label) {
 		return nil, ErrBadParameter.Withf("label: %q", c.Label)
+	}
+	// Create a router if it's not provided
+	if c.Router == nil {
+		if router, err := provider.New(ctx, router.Config{
+			Label: c.Label + "-router",
+		}); err != nil {
+			return nil, err
+		} else {
+			c.Router = router
+		}
 	}
 
 	// Return configuration

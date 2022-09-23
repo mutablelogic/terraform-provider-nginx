@@ -5,8 +5,12 @@ import "regexp"
 /////////////////////////////////////////////////////////////////////
 // GLOBALS
 
+const (
+	ReIdentifier = `[a-zA-Z][a-zA-Z0-9_\-]+`
+)
+
 var (
-	reValidName = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_\-]+$`)
+	reValidName = regexp.MustCompile(`^` + ReIdentifier + `$`)
 )
 
 /////////////////////////////////////////////////////////////////////

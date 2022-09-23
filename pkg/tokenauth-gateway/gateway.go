@@ -8,6 +8,9 @@ import (
 	// Namespace imports
 	. "github.com/mutablelogic/terraform-provider-nginx"
 	. "github.com/mutablelogic/terraform-provider-nginx/plugin"
+
+	// Module imports
+	util "github.com/mutablelogic/terraform-provider-nginx/pkg/util"
 )
 
 /////////////////////////////////////////////////////////////////////
@@ -22,7 +25,8 @@ type gateway struct {
 // GLOBALS
 
 var (
-	rePathList = regexp.MustCompile(`^/$`)
+	rePathList         = regexp.MustCompile(`^/$`)
+	rePathCreateRevoke = regexp.MustCompile(`^/(` + util.ReIdentifier + `)/?$`)
 )
 
 /////////////////////////////////////////////////////////////////////
@@ -36,6 +40,12 @@ func NewWithConfig(c Config) (Task, error) {
 
 	// Register routes
 	if err := c.Router.(Router).AddHandler(c.Prefix, rePathList, plugin.ListHandler, http.MethodGet); err != nil {
+		return nil, err
+	}
+	if err := c.Router.(Router).AddHandler(c.Prefix, rePathCreateRevoke, plugin.CreateHandler, http.MethodPost); err != nil {
+		return nil, err
+	}
+	if err := c.Router.(Router).AddHandler(c.Prefix, rePathCreateRevoke, plugin.RevokeHandler, http.MethodDelete); err != nil {
 		return nil, err
 	}
 

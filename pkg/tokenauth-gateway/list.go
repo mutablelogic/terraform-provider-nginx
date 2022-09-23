@@ -2,15 +2,15 @@ package tokenauth_gateway
 
 import (
 	"net/http"
-	"time"
 
 	// Modules
+	tokenauth "github.com/mutablelogic/terraform-provider-nginx/pkg/tokenauth"
 	util "github.com/mutablelogic/terraform-provider-nginx/pkg/util"
 )
 
 type Token struct {
-	Name       string    `json:"name"`
-	AccessTime time.Time `json:"access_time,omitempty"`
+	tokenauth.Token
+	Name string `json:"name"`
 }
 
 func (plugin *gateway) ListHandler(w http.ResponseWriter, r *http.Request) {
@@ -23,8 +23,8 @@ func (plugin *gateway) ListHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Create response
 	result := make([]Token, 0, len(tokens))
-	for name, atime := range tokens {
-		result = append(result, Token{Name: name, AccessTime: atime})
+	for name, time := range tokens {
+		result = append(result, Token{Name: name, Token: tokenauth.Token{Time: time}})
 	}
 
 	// Serve response

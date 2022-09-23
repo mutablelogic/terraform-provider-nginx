@@ -18,9 +18,10 @@ type ErrorResponse struct {
 // GLOBALS
 
 const (
-	ContentTypeKey  = "Content-Type"
-	ContentTypeJSON = "application/json"
-	ContentTypeText = "text/plain"
+	ContentTypeKey   = "Content-Type"
+	ContentLengthKey = "Content-Length"
+	ContentTypeJSON  = "application/json"
+	ContentTypeText  = "text/plain"
 )
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -42,6 +43,12 @@ func ServeText(w http.ResponseWriter, v string, code uint) {
 	w.Header().Add(ContentTypeKey, ContentTypeText)
 	w.WriteHeader(int(code))
 	w.Write([]byte(v + "\n"))
+}
+
+// ServeEmpty is a utility function to serve an empty response
+func ServeEmpty(w http.ResponseWriter, code uint) {
+	w.Header().Add(ContentLengthKey, "0")
+	w.WriteHeader(int(code))
 }
 
 // ServeError is a utility function to serve a JSON error notice
