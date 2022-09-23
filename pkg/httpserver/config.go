@@ -7,7 +7,9 @@ import (
 	// Namespace imports
 	. "github.com/djthorpe/go-errors"
 	. "github.com/mutablelogic/terraform-provider-nginx"
-	"github.com/mutablelogic/terraform-provider-nginx/pkg/util"
+
+	// Module imports
+	util "github.com/mutablelogic/terraform-provider-nginx/pkg/util"
 )
 
 ///////////////////////////////////////////////////////////////////////////////

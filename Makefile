@@ -39,7 +39,7 @@ $(CMD_DIR): dependencies mkdir FORCE
 
 $(PLUGIN_DIR): dependencies mkdir FORCE
 	@echo Build plugin $(notdir $@)
-	${GO} build -buildmode=plugin ${BUILD_FLAGS} -o ${BUILD_DIR}/$(notdir $@).plugin ./$@
+	@${GO} build -buildmode=plugin ${BUILD_FLAGS} -o ${BUILD_DIR}/$(notdir $@).plugin ./$@
 
 docker: dependencies docker-dependencies
 	@${DOCKER} build --tag ${IMAGE}-arm:${VERSION} --build-arg VERSION=${VERSION} --build-arg PLATFORM=linux/arm/v7 etc/docker
