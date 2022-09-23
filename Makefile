@@ -9,11 +9,18 @@ IMAGE := "nginx-gateway"
 
 # target architectures: linux/amd64 linux/arm/v7 linux/arm64/v8
 
+# Build flags
+BUILD_LD_FLAGS += -X $(BUILD_MODULE)/pkg/version.GitSource=${BUILD_MODULE}
+BUILD_LD_FLAGS += -X $(BUILD_MODULE)/pkg/version.GitTag=$(shell git describe --tags)
+BUILD_LD_FLAGS += -X $(BUILD_MODULE)/pkg/version.GitBranch=$(shell git name-rev HEAD --name-only --always)
+BUILD_LD_FLAGS += -X $(BUILD_MODULE)/pkg/version.GitHash=$(shell git rev-parse HEAD)
+BUILD_LD_FLAGS += -X $(BUILD_MODULE)/pkg/version.GoBuildTime=$(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
+BUILD_FLAGS = -ldflags "-s -w $(BUILD_LD_FLAGS)" 
+
 # Paths to locations, etc
 BUILD_DIR := "build"
 PLUGIN_DIR := $(wildcard plugin/*)
 CMD_DIR := $(wildcard cmd/*)
-BUILD_FLAGS := ""
 
 # Targets
 all: clean cmd
@@ -32,7 +39,7 @@ $(CMD_DIR): dependencies mkdir FORCE
 
 $(PLUGIN_DIR): dependencies mkdir FORCE
 	@echo Build plugin $(notdir $@)
-	@${GO} build -buildmode=plugin -o ${BUILD_DIR}/$(notdir $@).plugin ${BUILD_FLAGS} ./$@
+	${GO} build -buildmode=plugin ${BUILD_FLAGS} -o ${BUILD_DIR}/$(notdir $@).plugin ./$@
 
 docker: dependencies docker-dependencies
 	@${DOCKER} build --tag ${IMAGE}-arm:${VERSION} --build-arg VERSION=${VERSION} --build-arg PLATFORM=linux/arm/v7 etc/docker

@@ -12,29 +12,15 @@ import (
 	// Modules
 	multierror "github.com/hashicorp/go-multierror"
 	fcgi "github.com/mutablelogic/terraform-provider-nginx/pkg/fcgi"
+	"github.com/mutablelogic/terraform-provider-nginx/pkg/provider"
 
 	// Namespace imports
 	. "github.com/djthorpe/go-errors"
 	. "github.com/mutablelogic/terraform-provider-nginx"
+	. "github.com/mutablelogic/terraform-provider-nginx/plugin"
 )
 
-///////////////////////////////////////////////////////////////////////////////
-// TYPES
-
-type ServerConfig struct {
-	Label   string        `hcl:"label,label"`
-	Router  Task          `hcl:"router,optional"`
-	Addr    string        `hcl:"listen,optional"`  // Address or path for binding HTTP server
-	TLS     *TLS          `hcl:"tls,block"`        // TLS parameters
-	Timeout time.Duration `hcl:"timeout,optional"` // Read timeout on HTTP requests
-}
-
-type TLS struct {
-	Key  string `hcl:"key"`  // Path to TLS Private Key
-	Cert string `hcl:"cert"` // Path to TLS Certificate
-}
-
-type server struct {
+type httpserver struct {
 	Router
 	label string
 	srv   *http.Server
@@ -42,28 +28,11 @@ type server struct {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// GLOBALS
-
-const (
-	DefaultTimeout = 10 * time.Second
-)
-
-///////////////////////////////////////////////////////////////////////////////
 // LIFECYCLE
 
-// Return name of the plugin
-func (cfg ServerConfig) Name() string {
-	return "httpserver"
-}
-
-// Return requires
-func (cfg ServerConfig) Requires() []string {
-	return []string{"router"}
-}
-
 // Create the server
-func (cfg ServerConfig) New(ctx context.Context, provider Provider) (Task, error) {
-	this := new(server)
+func NewWithConfig(c Config) (*httpserver, error) {
+	this := new(httpserver)
 
 	// Set label
 	if cfg.Label == "" {
@@ -172,20 +141,9 @@ func (this *server) String() string {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// PUBLIC METHODS
-
-func (*server) C() <-chan Event {
-	return nil
-}
-
-func (s *server) Label() string {
-	return s.label
-}
-
-///////////////////////////////////////////////////////////////////////////////
 // PRIVATE METHODS
 
-func (this *server) fcgiserver(path string, handler http.Handler) error {
+func (this *httpserver) fcgiserver(path string, handler http.Handler) error {
 	// Create server
 	this.fcgi = &fcgi.Server{}
 	this.fcgi.Network = "unix"
@@ -196,7 +154,7 @@ func (this *server) fcgiserver(path string, handler http.Handler) error {
 	return nil
 }
 
-func (this *server) netserver(addr string, config *tls.Config, timeout time.Duration, handler http.Handler) error {
+func (this *httpserver) netserver(addr string, config *tls.Config, timeout time.Duration, handler http.Handler) error {
 	// Set up server
 	this.srv = &http.Server{}
 	if config != nil {
@@ -221,7 +179,7 @@ func (this *server) netserver(addr string, config *tls.Config, timeout time.Dura
 ///////////////////////////////////////////////////////////////////////////////
 // START AND STOP
 
-func (this *server) runInForeground() error {
+func (this *httpserver) runInForeground() error {
 	if this.fcgi != nil {
 		return this.fcgi.ListenAndServe()
 	} else if this.srv.TLSConfig != nil {
@@ -231,7 +189,7 @@ func (this *server) runInForeground() error {
 	}
 }
 
-func (this *server) stop() error {
+func (this *httpserver) stop() error {
 	if this.fcgi != nil {
 		return this.fcgi.Close()
 	} else {
