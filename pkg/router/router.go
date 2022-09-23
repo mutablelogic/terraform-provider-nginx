@@ -13,7 +13,7 @@ import (
 	util "github.com/mutablelogic/terraform-provider-nginx/pkg/util"
 
 	// Namespace imports
-	. "github.com/djthorpe/go-errors"
+	//. "github.com/djthorpe/go-errors"
 	. "github.com/mutablelogic/terraform-provider-nginx/plugin"
 )
 
@@ -137,6 +137,11 @@ func (r *router) get(method, path string) (*route, []string) {
 			continue
 		}
 
+		// Check against the method
+		if !contains(route.methods, method) {
+			continue
+		}
+
 		// Add a / to the beginning of the path
 		relpath := normalizePath(path[len(route.prefix):], false)
 
@@ -192,4 +197,14 @@ func normalizePath(path string, end bool) string {
 		path = path + pathSeparator
 	}
 	return path
+}
+
+// contains returns true if a string array contains a string
+func contains(a []string, s string) bool {
+	for _, v := range a {
+		if v == s {
+			return true
+		}
+	}
+	return false
 }
