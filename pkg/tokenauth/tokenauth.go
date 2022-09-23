@@ -12,6 +12,7 @@ import (
 
 	// Module imports
 	event "github.com/mutablelogic/terraform-provider-nginx/pkg/event"
+	"github.com/mutablelogic/terraform-provider-nginx/pkg/util"
 
 	// Namespace imports
 	. "github.com/djthorpe/go-errors"
@@ -109,7 +110,7 @@ func (c *auth) Create(name string) (string, error) {
 	defer c.Unlock()
 
 	// If the name is invalid, then return an error
-	if !reValidName.MatchString(name) {
+	if !util.IsIdentifier(name) {
 		return "", ErrBadParameter.Withf("%q", name)
 	}
 	// If the name exists already, then return an error

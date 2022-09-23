@@ -4,8 +4,10 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"regexp"
 	"time"
+
+	// Module imports
+	util "github.com/mutablelogic/terraform-provider-nginx/pkg/util"
 
 	// Namespace imports
 	. "github.com/djthorpe/go-errors"
@@ -37,10 +39,6 @@ const (
 	defaultEventChannelCapacity = 1000
 )
 
-var (
-	reValidName = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_\-]+$`)
-)
-
 /////////////////////////////////////////////////////////////////////
 // LIFECYCLE
 
@@ -57,7 +55,7 @@ func (c Config) New(ctx context.Context, provider Provider) (Task, error) {
 	}
 
 	// Check label is valid
-	if !reValidName.MatchString(c.Label) {
+	if !util.IsIdentifier(c.Label) {
 		return nil, ErrBadParameter.Withf("label: %q", c.Label)
 	}
 

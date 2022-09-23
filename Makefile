@@ -11,13 +11,16 @@ IMAGE := "nginx-gateway"
 
 # Paths to locations, etc
 BUILD_DIR := "build"
+PLUGIN_DIR := $(wildcard plugin/*)
 CMD_DIR := $(wildcard cmd/*)
 BUILD_FLAGS := ""
 
 # Targets
 all: clean cmd
 
-cmd: $(CMD_DIR)
+cmd: $(filter-out cmd/README.md, $(wildcard cmd/*))
+
+plugins: $(filter-out $(wildcard plugin/*.go), $(wildcard plugin/*))
 
 test:
 	@${GO} mod tidy
@@ -26,6 +29,10 @@ test:
 $(CMD_DIR): dependencies mkdir FORCE
 	@echo Build cmd $(notdir $@)
 	@${GO} build ${BUILD_FLAGS} -o ${BUILD_DIR}/$(notdir $@) ./$@
+
+$(PLUGIN_DIR): dependencies mkdir FORCE
+	@echo Build plugin $(notdir $@)
+	@${GO} build -buildmode=plugin -o ${BUILD_DIR}/$(notdir $@).plugin ${BUILD_FLAGS} ./$@
 
 docker: dependencies docker-dependencies
 	@${DOCKER} build --tag ${IMAGE}-arm:${VERSION} --build-arg VERSION=${VERSION} --build-arg PLATFORM=linux/arm/v7 etc/docker

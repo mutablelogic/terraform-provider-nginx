@@ -1,0 +1,17 @@
+package util
+
+import "regexp"
+
+/////////////////////////////////////////////////////////////////////
+// GLOBALS
+
+var (
+	reValidName = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_\-]+$`)
+)
+
+/////////////////////////////////////////////////////////////////////
+// PUBLIC METHODS
+
+func IsIdentifier(s string) bool {
+	return reValidName.MatchString(s)
+}

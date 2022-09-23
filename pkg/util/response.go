@@ -1,4 +1,4 @@
-package httpserver
+package util
 
 import (
 	"encoding/json"
@@ -18,6 +18,7 @@ type ErrorResponse struct {
 // GLOBALS
 
 const (
+	ContentTypeKey  = "Content-Type"
 	ContentTypeJSON = "application/json"
 	ContentTypeText = "text/plain"
 )
@@ -27,7 +28,7 @@ const (
 
 // ServeJSON is a utility function to serve an arbitary object as JSON
 func ServeJSON(w http.ResponseWriter, v interface{}, code, indent uint) error {
-	w.Header().Add("Content-Type", ContentTypeJSON)
+	w.Header().Add(ContentTypeKey, ContentTypeJSON)
 	w.WriteHeader(int(code))
 	enc := json.NewEncoder(w)
 	if indent > 0 {
@@ -38,7 +39,7 @@ func ServeJSON(w http.ResponseWriter, v interface{}, code, indent uint) error {
 
 // ServeText is a utility function to serve plaintext
 func ServeText(w http.ResponseWriter, v string, code uint) {
-	w.Header().Add("Content-Type", ContentTypeText)
+	w.Header().Add(ContentTypeKey, ContentTypeText)
 	w.WriteHeader(int(code))
 	w.Write([]byte(v + "\n"))
 }

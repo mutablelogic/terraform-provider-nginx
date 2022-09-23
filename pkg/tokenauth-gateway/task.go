@@ -1,4 +1,4 @@
-package main
+package tokenauth_gateway
 
 import (
 	"context"
@@ -11,15 +11,15 @@ import (
 // PUBLIC METHODS
 
 // Run will write the authorization tokens back to disk if they have been modified
-func (plugin *gateway) Run(ctx context.Context) error {
+func (*gateway) Run(ctx context.Context) error {
 	<-ctx.Done()
 	return ctx.Err()
 }
 
 func (plugin *gateway) Label() string {
-	return c.label
+	return plugin.label
 }
 
-func (plugin *gateway) C() <-chan Event {
+func (*gateway) C() <-chan Event {
 	return nil
 }

@@ -37,6 +37,7 @@ func (c *auth) Run(ctx context.Context) error {
 	}
 }
 
+// Return label
 func (c *auth) Label() string {
 	return c.label
 }
