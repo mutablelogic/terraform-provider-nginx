@@ -3,6 +3,7 @@ package nginx
 import (
 	"fmt"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -21,13 +22,6 @@ type Folder struct {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// GLOBALS
-
-const (
-	pathSeparator = string(filepath.Separator)
-)
-
-///////////////////////////////////////////////////////////////////////////////
 // LIFECYCLE
 
 func NewFolder(fs fs.StatFS, path string, recursive bool) (*Folder, error) {
@@ -39,7 +33,9 @@ func NewFolder(fs fs.StatFS, path string, recursive bool) (*Folder, error) {
 	}
 
 	// Check to make sure path is valid
-	if info, err := fs.Stat(path); err != nil {
+	if info, err := fs.Stat(path); os.IsNotExist(err) {
+		return nil, ErrNotFound.With(path)
+	} else if err != nil {
 		return nil, err
 	} else if !info.IsDir() {
 		return nil, ErrBadParameter.With(path)
@@ -53,10 +49,6 @@ func NewFolder(fs fs.StatFS, path string, recursive bool) (*Folder, error) {
 	return f, nil
 }
 
-func (f *Folder) Enumerate() ([]*File, error) {
-	return enumerateFiles(f.fs, f.path, f.recursive)
-}
-
 ///////////////////////////////////////////////////////////////////////////////
 // STRINFIGY
 
@@ -67,6 +59,23 @@ func (f *Folder) String() string {
 		str += " recursive"
 	}
 	return str + ">"
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// PUBLIC METHODS
+
+func (f *Folder) RelPath(root string) string {
+	if root == "" {
+		return f.path
+	} else if rel, err := filepath.Rel(root, f.path); err != nil {
+		return f.path
+	} else {
+		return rel
+	}
+}
+
+func (f *Folder) Enumerate() ([]*File, error) {
+	return enumerateFiles(f.fs, f.path, f.recursive)
 }
 
 ///////////////////////////////////////////////////////////////////////////////

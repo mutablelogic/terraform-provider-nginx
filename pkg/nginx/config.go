@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	// Modules
 	util "github.com/mutablelogic/terraform-provider-nginx/pkg/util"
@@ -32,6 +33,7 @@ const (
 	DefaultLabel     = "nginx"
 	defaultAvailable = "sites-available"
 	defaultEnabled   = "sites-enabled"
+	pathSeparator    = string(os.PathSeparator)
 )
 
 /////////////////////////////////////////////////////////////////////
@@ -43,6 +45,8 @@ func (c Config) Name() string {
 
 // Return a new task. Label for the task can be retrieved from context
 func (c Config) New(ctx context.Context, provider Provider) (Task, error) {
+	filesys := os.DirFS(pathSeparator).(fs.StatFS)
+
 	// Set label
 	if c.Label == "" {
 		c.Label = DefaultLabel
@@ -53,22 +57,37 @@ func (c Config) New(ctx context.Context, provider Provider) (Task, error) {
 		return nil, ErrBadParameter.Withf("label: %q", c.Label)
 	}
 
-	// Set available and enabled if not set
+	// Check path
+	if c.Path == "" || !filepath.IsAbs(c.Path) {
+		if cwd, err := os.Getwd(); err != nil {
+			return nil, ErrBadParameter.With(err)
+		} else {
+			c.Path = filepath.Join(cwd, c.Path)
+		}
+	}
+	c.Path = strings.TrimPrefix(c.Path, pathSeparator)
+	if info, err := filesys.Stat(c.Path); err != nil {
+		return nil, ErrBadParameter.With(err)
+	} else if !info.IsDir() {
+		return nil, ErrBadParameter.With(c.Path)
+	}
+
+	// Set available path
 	if c.Available == "" {
 		c.Available = defaultAvailable
 	}
+	if !filepath.IsAbs(c.Available) {
+		c.Available = filepath.Join(c.Path, c.Available)
+	}
+
+	// Set enabled path
 	if c.Enabled == "" {
 		c.Enabled = defaultEnabled
 	}
-
-	// Make enabled and available absolute paths
-	if !filepath.IsAbs(c.Available) && c.Path != "" {
-		c.Available = filepath.Clean(filepath.Join(c.Path, c.Available))
-	}
-	if !filepath.IsAbs(c.Enabled) && c.Path != "" {
-		c.Enabled = filepath.Clean(filepath.Join(c.Path, c.Enabled))
+	if !filepath.IsAbs(c.Enabled) {
+		c.Enabled = filepath.Join(c.Path, c.Enabled)
 	}
 
 	// Return configuration
-	return NewWithConfig(os.DirFS("/").(fs.StatFS), c)
+	return NewWithConfig(filesys, c)
 }
