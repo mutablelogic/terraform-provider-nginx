@@ -19,11 +19,12 @@ import (
 // TYPES
 
 type Config struct {
-	Label     string `hcl:"label,label"`        // Label for the configuration
-	Path      string `hcl:"root"`               // Root path for the configuration
-	Available string `hcl:"available,optional"` // Path to available sites, under root
-	Recursive bool   `hcl:"recursive,optional"` // Recursively search in available folder
-	Enabled   string `hcl:"enabled,optional"`   // Path to enabled sites, under root
+	Label     string `hcl:"label,label"`                  // Label for the configuration
+	Path      string `hcl:"conf_path"`                    // Root path for the configuration
+	PidPath   string `hcl:"pid_path,optional"`            // Path to the PID file
+	Available string `hcl:"available_path,optional"`      // Path to available sites, under root
+	Recursive bool   `hcl:"available_recursive,optional"` // Recursively search in available folder
+	Enabled   string `hcl:"enabled_path,optional"`        // Path to enabled sites, under root
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -33,6 +34,7 @@ const (
 	DefaultLabel     = "nginx"
 	defaultAvailable = "sites-available"
 	defaultEnabled   = "sites-enabled"
+	defaultPidPath   = "/run/nginx.pid"
 	pathSeparator    = string(os.PathSeparator)
 )
 
@@ -50,6 +52,11 @@ func (c Config) New(ctx context.Context, provider Provider) (Task, error) {
 	// Set label
 	if c.Label == "" {
 		c.Label = DefaultLabel
+	}
+
+	// Set PID path
+	if c.PidPath == "" {
+		c.PidPath = defaultPidPath
 	}
 
 	// Check label

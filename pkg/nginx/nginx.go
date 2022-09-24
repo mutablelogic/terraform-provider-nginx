@@ -4,8 +4,12 @@ import (
 	"fmt"
 	"io/fs"
 
+	// Modules
+	multierror "github.com/hashicorp/go-multierror"
+	util "github.com/mutablelogic/terraform-provider-nginx/pkg/util"
+
 	// Namespace imports
-	"github.com/hashicorp/go-multierror"
+	. "github.com/djthorpe/go-errors"
 	. "github.com/mutablelogic/terraform-provider-nginx"
 	. "github.com/mutablelogic/terraform-provider-nginx/plugin"
 )
@@ -16,6 +20,7 @@ import (
 type nginx struct {
 	label     string
 	root      string
+	fs        fs.StatFS
 	available *Folder
 	enabled   *Folder
 }
@@ -23,20 +28,27 @@ type nginx struct {
 /////////////////////////////////////////////////////////////////////
 // LIFECYCLE
 
-func NewWithConfig(fs fs.StatFS, c Config) (Task, error) {
+func NewWithConfig(filesys fs.FS, c Config) (Task, error) {
 	r := new(nginx)
 	r.label = c.Label
 	r.root = c.Path
 
+	// Check filesystem
+	if filesys_, ok := filesys.(fs.StatFS); !ok || filesys_ == nil {
+		return nil, ErrBadParameter.With("fs does not implement fs.StatFS")
+	} else {
+		r.fs = filesys_
+	}
+
 	// Set up available folder
-	if folder, err := NewFolder(fs, c.Available, c.Recursive); err != nil {
+	if folder, err := NewFolder(r.fs, c.Available, c.Recursive); err != nil {
 		return nil, err
 	} else {
 		r.available = folder
 	}
 
 	// Set up enabled folder
-	if folder, err := NewFolder(fs, c.Enabled, false); err != nil {
+	if folder, err := NewFolder(r.fs, c.Enabled, false); err != nil {
 		return nil, err
 	} else {
 		r.enabled = folder
@@ -71,6 +83,7 @@ func (r *nginx) Enumerate() ([]NginxConfig, error) {
 	if err != nil {
 		result = multierror.Append(result, err)
 	}
+
 	enabled, err := r.enabled.Enumerate()
 	if err != nil {
 		result = multierror.Append(result, err)
@@ -80,8 +93,68 @@ func (r *nginx) Enumerate() ([]NginxConfig, error) {
 		return nil, result
 	}
 
-	fmt.Println(available, enabled)
+	// Create map of available files, based on MD5 hash
+	config := make(map[string]*File, len(available))
+	for _, file := range available {
+		data, err := file.Read(r.fs)
+		if err != nil {
+			result = multierror.Append(result, err)
+			continue
+		}
+		hash := util.MD5Hash(data)
+		if _, exists := config[hash]; exists {
+			result = multierror.Append(result, ErrInternalAppError.Withf("%v: duplicate", file.Path()))
+			continue
+		} else {
+			file.SetAvailable(true)
+			file.SetEnabled(false)
+			config[hash] = file
+		}
+	}
+
+	// If there are errors, return them
+	if result != nil {
+		return nil, result
+	}
+
+	// Set enabled if the file exists in the map
+	for _, file := range enabled {
+		data, err := file.Read(r.fs)
+		if err != nil {
+			result = multierror.Append(result, err)
+			continue
+		}
+		hash := util.MD5Hash(data)
+		if configfile, exists := config[hash]; !exists {
+			config[hash] = file
+			file.SetEnabled(true)
+			file.SetAvailable(false)
+		} else {
+			configfile.SetEnabled(true)
+		}
+	}
+
+	// Create a set of configs
+	configs := make([]NginxConfig, 0, len(config))
+	for _, file := range config {
+		configs = append(configs, file)
+	}
 
 	// Return success
-	return nil, nil
+	return configs, nil
+}
+
+// Enable a configuration
+func (r *nginx) Enable(file NginxConfig) error {
+	file_, ok := file.(*File)
+	if !ok || file_ == nil {
+		return ErrBadParameter
+	}
+
+	return ErrNotImplemented
+}
+
+// Revoke a configuration
+func (r *nginx) Revoke(NginxConfig) error {
+	return ErrNotImplemented
 }

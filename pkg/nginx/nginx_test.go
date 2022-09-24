@@ -40,10 +40,17 @@ func Test_Nginx_001(t *testing.T) {
 	}
 
 	// Enumerate files
-	if configs, err := nginx.(plugin.Nginx).Enumerate(); err != nil {
+	configs, err := nginx.(plugin.Nginx).Enumerate()
+	if err != nil {
 		t.Error(err)
-	} else {
-		t.Log(configs)
 	}
 
+	// Enable all configs
+	for _, config := range configs {
+		if !config.Enabled() {
+			if err := nginx.(plugin.Nginx).Enable(config); err != nil {
+				t.Error(err)
+			}
+		}
+	}
 }
