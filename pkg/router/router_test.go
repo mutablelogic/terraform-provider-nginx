@@ -10,10 +10,11 @@ import (
 
 	// Module import
 	provider "github.com/mutablelogic/terraform-provider-nginx/pkg/provider"
+	plugin "github.com/mutablelogic/terraform-provider-nginx/plugin"
 
 	// Namespace imports
+	. "github.com/mutablelogic/terraform-provider-nginx"
 	. "github.com/mutablelogic/terraform-provider-nginx/pkg/router"
-	. "github.com/mutablelogic/terraform-provider-nginx/plugin"
 )
 
 /////////////////////////////////////////////////////////////////////
@@ -42,37 +43,37 @@ func Test_Router_002(t *testing.T) {
 	}
 
 	// Add a route for '/'
-	if err := router.(Router).AddHandler("/", nil, func(w http.ResponseWriter, r *http.Request) {
+	if err := router.(plugin.Router).AddHandler(Gateway("/"), nil, func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("/"))
 	}); err != nil {
 		t.Error(err)
 	}
 	// Add a route for '/A'
-	if err := router.(Router).AddHandler("/A", nil, func(w http.ResponseWriter, r *http.Request) {
+	if err := router.(plugin.Router).AddHandler(Gateway("/A"), nil, func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("/A"))
 	}); err != nil {
 		t.Error(err)
 	}
 	// Add a route for '/AA'
-	if err := router.(Router).AddHandler("/AA", nil, func(w http.ResponseWriter, r *http.Request) {
+	if err := router.(plugin.Router).AddHandler(Gateway("/AA"), nil, func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("/AA"))
 	}); err != nil {
 		t.Error(err)
 	}
 	// Add a route for '/' with regexp
-	if err := router.(Router).AddHandler("/", regexp.MustCompile("^/(test1)"), func(w http.ResponseWriter, r *http.Request) {
+	if err := router.(plugin.Router).AddHandler(Gateway("/"), regexp.MustCompile("^/(test1)"), func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("/test1"))
 	}); err != nil {
 		t.Error(err)
 	}
 	// Add a route for '/AA' with regexp
-	if err := router.(Router).AddHandler("/AA", regexp.MustCompile("^/(test2)"), func(w http.ResponseWriter, r *http.Request) {
+	if err := router.(plugin.Router).AddHandler(Gateway("/AA"), regexp.MustCompile("^/(test2)"), func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("/AA/test2"))
 	}); err != nil {
 		t.Error(err)
 	}
 	// Add a route for '/AA' with regexp
-	if err := router.(Router).AddHandler("/AA", regexp.MustCompile("^/(test3)"), func(w http.ResponseWriter, r *http.Request) {
+	if err := router.(plugin.Router).AddHandler(Gateway("/AA"), regexp.MustCompile("^/(test3)"), func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("/AA/test3"))
 	}); err != nil {
 		t.Error(err)
@@ -104,4 +105,39 @@ func Test_Router_002(t *testing.T) {
 			t.Errorf("Test %d: unexpected body: %q", i, body)
 		}
 	}
+}
+
+/////////////////////////////////////////////////////////////////////
+// TASK
+
+type task struct {
+	prefix string
+}
+
+func Gateway(prefix string) plugin.Gateway {
+	return &task{prefix: prefix}
+}
+
+func (t *task) Prefix() string {
+	return t.prefix
+}
+
+func (t *task) Label() string {
+	return "gateway"
+}
+
+func (t *task) Middleware() []string {
+	return nil
+}
+
+// Run is called to start the task and block until context is cancelled
+func (t *task) Run(ctx context.Context) error {
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+// C returns a channel on which events can be received, or returns nil
+// if the task does not emit events
+func (t *task) C() <-chan Event {
+	return nil
 }

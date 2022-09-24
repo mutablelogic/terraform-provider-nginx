@@ -8,11 +8,11 @@ import (
 	"time"
 
 	// Module imports
+	event "github.com/mutablelogic/terraform-provider-nginx/pkg/event"
 
 	// Namespace imports
 	. "github.com/djthorpe/go-errors"
 	. "github.com/mutablelogic/terraform-provider-nginx"
-	"github.com/mutablelogic/terraform-provider-nginx/pkg/event"
 	. "github.com/mutablelogic/terraform-provider-nginx/pkg/provider"
 )
 

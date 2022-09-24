@@ -15,6 +15,9 @@ const (
 	funcConfig = "Config"
 )
 
+///////////////////////////////////////////////////////////////////////////////
+// PUBLIC METHODS
+
 // PluginWithPath returns a plugin from a file path
 func PluginWithPath(path string) (*TaskPlugin, error) {
 	// Create a new module from plugin

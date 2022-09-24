@@ -14,14 +14,12 @@ import (
 	"golang.org/x/exp/slices"
 
 	// Namespace imports
-	//. "github.com/djthorpe/go-errors"
+	. "github.com/djthorpe/go-errors"
 	. "github.com/mutablelogic/terraform-provider-nginx/plugin"
 )
 
 /////////////////////////////////////////////////////////////////////
 // TYPES
-
-type middlewarefn func(http.HandlerFunc) http.HandlerFunc
 
 type router struct {
 	sync.RWMutex
@@ -74,14 +72,19 @@ func (r *router) String() string {
 // If the path argument is nil, then any path under the prefix will match. If the path contains
 // a regular expression, then a match is made and any matched parameters of the regular
 // expression can be retrieved from the request context.
-func (r *router) AddHandler(prefix string, path *regexp.Regexp, fn http.HandlerFunc, methods ...string) error {
+func (r *router) AddHandler(gateway Gateway, path *regexp.Regexp, fn http.HandlerFunc, methods ...string) error {
+	// Check gateway
+	if gateway == nil {
+		return ErrBadParameter.With("gateway")
+	}
+
 	// If methods is empty, default to GET
 	if len(methods) == 0 {
 		methods = []string{"GET"}
 	}
 
 	// Append the route
-	r.routes = append(r.routes, route{normalizePath(prefix, true), path, fn, methods})
+	r.routes = append(r.routes, route{normalizePath(gateway.Prefix(), true), path, fn, methods})
 
 	// Sort routes by prefix length, longest first, and then by path != nil vs nil
 	sort.Slice(r.routes, func(i, j int) bool {
@@ -106,13 +109,11 @@ func (r *router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Check methods
-	// TODO: This is not efficient
-	for _, method := range route.methods {
-		if req.Method == method {
-			route.fn(w, req.Clone(context.WithPrefixParams(req.Context(), route.prefix, params)))
-			return
-		}
+	if slices.Contains(route.methods, req.Method) {
+		route.fn(w, req.Clone(context.WithPrefixParams(req.Context(), route.prefix, params)))
+		return
 	}
+
 	// Return method not allowed
 	util.ServeError(w, http.StatusMethodNotAllowed)
 }
@@ -128,40 +129,40 @@ func (r *router) get(method, path string) (*route, []string) {
 		return route, params
 	}
 
-	// Search routes
+	// Search routes to find candidates
+	methodAllowed := true
 	for i := range r.routes {
-		route := &r.routes[i]
+		route := r.routes[i]
 
 		// Check against the prefix
 		if !strings.HasPrefix(path, route.prefix) {
 			continue
 		}
 
-		// Check against the method
-		if !contains(route.methods, method) {
+		// Check for default route: this is the route that matches everything
+		if route.path == nil {
+			if contains(route.methods, method) {
+				r.setcached(method, path, i, nil)
+				return &route, nil
+			}
+			methodAllowed = false
 			continue
 		}
 
-		// Add a / to the beginning of the path
+		// Check with a regular expression
 		relpath := normalizePath(path[len(route.prefix):], false)
-
-		// Check for default route: this is the route that matches everything
-		if route.path == nil {
-			// Set cache
-			r.setcached(method, path, i, nil)
-
-			// Return route and params
-			return route, nil
-		}
-
-		// Check for route with a regular expression
 		if params := route.path.FindStringSubmatch(relpath); params != nil {
-			// Set cache
-			r.setcached(method, path, i, params[1:])
-
-			// Return route and params
-			return route, params[1:]
+			if contains(route.methods, method) {
+				r.setcached(method, path, i, params[1:])
+				return &route, nil
+			}
+			methodAllowed = false
+			continue
 		}
+	}
+
+	if !methodAllowed {
+		fmt.Println("TODO: methodNotAllowed", method, path)
 	}
 
 	// No match
@@ -188,7 +189,7 @@ func (r *router) setcached(method, path string, index int, params []string) {
 	r.cache[method+path] = &cached{index, params}
 }
 
-// Add a / to the beginning and end of the path
+// Add a / to the beginning and optionally to the end of the path
 func normalizePath(path string, end bool) string {
 	if !strings.HasPrefix(path, pathSeparator) {
 		path = pathSeparator + path
