@@ -88,7 +88,7 @@ func (p *provider) Run(ctx context.Context) error {
 					case <-ctx.Done():
 						return
 					case event := <-ch:
-						if !event.Emit(p.ch) {
+						if event != nil && !event.Emit(p.ch) {
 							panic(fmt.Sprint("Unable to emit:", event))
 						}
 					}

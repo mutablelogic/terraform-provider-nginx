@@ -16,6 +16,7 @@ type gateway struct {
 	Nginx
 	label, prefix string
 	middleware    []string
+	ch            chan Event
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -33,6 +34,7 @@ func NewWithConfig(c Config) (Task, error) {
 	plugin := new(gateway)
 	plugin.label = c.Label
 	plugin.prefix = c.Prefix
+	plugin.ch = make(chan Event)
 	plugin.Nginx = c.Nginx.(Nginx)
 
 	// Register handlers

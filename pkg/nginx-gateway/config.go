@@ -41,11 +41,11 @@ func (c Config) New(ctx context.Context, provider Provider) (Task, error) {
 	if _, ok := c.Router.(Router); c.Router == nil || !ok {
 		return nil, ErrBadParameter.With("router")
 	}
-	if _, ok := c.Nginx.(TokenAuth); c.Nginx == nil || !ok {
+	if _, ok := c.Nginx.(Nginx); c.Nginx == nil || !ok {
 		return nil, ErrBadParameter.With("nginx")
 	}
 
-	// Set confuguration defaults
+	// Set configuration defaults
 	if c.Label == "" {
 		c.Label = c.Nginx.Label() + DefaultLabelSuffix
 	}
