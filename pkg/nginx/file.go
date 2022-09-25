@@ -60,7 +60,9 @@ func CreateFile(path string, data []byte) (*File, error) {
 func (f *File) String() string {
 	str := "<nginx-file"
 	str += fmt.Sprintf(" name=%q", f.Name())
-	str += fmt.Sprintf(" size=%d", f.info.Size())
+	if f.info != nil {
+		str += fmt.Sprintf(" size=%d", f.info.Size())
+	}
 	if f.enabled != "" {
 		str += " enabled"
 	}
