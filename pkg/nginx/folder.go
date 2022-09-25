@@ -16,7 +16,6 @@ import (
 
 // Folder tracks files within a folder
 type Folder struct {
-	fs        fs.StatFS
 	path      string
 	recursive bool
 }
@@ -24,23 +23,17 @@ type Folder struct {
 ///////////////////////////////////////////////////////////////////////////////
 // LIFECYCLE
 
-func NewFolder(fs fs.StatFS, path string, recursive bool) (*Folder, error) {
+func NewFolder(path string, recursive bool) (*Folder, error) {
 	f := new(Folder)
 
-	// Remove initial '/' from path
-	if strings.HasPrefix(path, pathSeparator) {
-		path = path[1:]
-	}
-
 	// Check to make sure path is valid
-	if info, err := fs.Stat(path); os.IsNotExist(err) {
+	if info, err := os.Stat(path); os.IsNotExist(err) {
 		return nil, ErrNotFound.With(path)
 	} else if err != nil {
 		return nil, err
 	} else if !info.IsDir() {
 		return nil, ErrBadParameter.With(path)
 	} else {
-		f.fs = fs
 		f.path = path
 		f.recursive = recursive
 	}
@@ -75,23 +68,16 @@ func (f *Folder) RelPath(root string) string {
 }
 
 func (f *Folder) Enumerate() ([]*File, error) {
-	return enumerateFiles(f.fs, f.path, f.recursive)
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// PRIVATE METHODS
-
-func enumerateFiles(filesys fs.StatFS, root string, recursive bool) ([]*File, error) {
 	var result []*File
 
-	if err := fs.WalkDir(filesys, root, func(path string, d fs.DirEntry, err error) error {
+	if err := filepath.WalkDir(f.path, func(path string, d fs.DirEntry, err error) error {
 		// Skip errors
 		if err != nil {
 			return err
 		}
 
 		// Ignore hidden files
-		if strings.HasPrefix(d.Name(), ".") && root != path {
+		if strings.HasPrefix(d.Name(), ".") && f.path != path {
 			if d.IsDir() {
 				return filepath.SkipDir
 			} else {
@@ -100,8 +86,8 @@ func enumerateFiles(filesys fs.StatFS, root string, recursive bool) ([]*File, er
 		}
 
 		// Recurse into directories
-		if d.IsDir() && root != path {
-			if recursive {
+		if d.IsDir() && f.path != path {
+			if f.recursive {
 				return nil
 			} else {
 				return filepath.SkipDir
@@ -123,6 +109,9 @@ func enumerateFiles(filesys fs.StatFS, root string, recursive bool) ([]*File, er
 		return result, nil
 	}
 }
+
+///////////////////////////////////////////////////////////////////////////////
+// PRIVATE METHODS
 
 func validFileMode(mode fs.FileMode) bool {
 	if mode.IsRegular() {

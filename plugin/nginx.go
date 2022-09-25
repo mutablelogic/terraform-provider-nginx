@@ -12,11 +12,17 @@ type Nginx interface {
 	// Return all configurations
 	Enumerate() ([]NginxConfig, error)
 
-	// Enable a configuration
-	Enable(NginxConfig) error
+	// Create a configuration
+	Create(string, []byte) (NginxConfig, error)
 
 	// Revoke a configuration
 	Revoke(NginxConfig) error
+
+	// Enable a configuration
+	Enable(NginxConfig) error
+
+	// Disable a configuration
+	Disable(NginxConfig) error
 }
 
 // NginxConfig provides a configuration that can be enabled or revoked

@@ -2,7 +2,9 @@ package nginx
 
 import (
 	"fmt"
-	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
 
 	// Modules
 	multierror "github.com/hashicorp/go-multierror"
@@ -20,7 +22,6 @@ import (
 type nginx struct {
 	label     string
 	root      string
-	fs        fs.StatFS
 	available *Folder
 	enabled   *Folder
 }
@@ -28,27 +29,20 @@ type nginx struct {
 /////////////////////////////////////////////////////////////////////
 // LIFECYCLE
 
-func NewWithConfig(filesys fs.FS, c Config) (Task, error) {
+func NewWithConfig(c Config) (Task, error) {
 	r := new(nginx)
 	r.label = c.Label
 	r.root = c.Path
 
-	// Check filesystem
-	if filesys_, ok := filesys.(fs.StatFS); !ok || filesys_ == nil {
-		return nil, ErrBadParameter.With("fs does not implement fs.StatFS")
-	} else {
-		r.fs = filesys_
-	}
-
 	// Set up available folder
-	if folder, err := NewFolder(r.fs, c.Available, c.Recursive); err != nil {
+	if folder, err := NewFolder(c.Available, c.Recursive); err != nil {
 		return nil, err
 	} else {
 		r.available = folder
 	}
 
 	// Set up enabled folder
-	if folder, err := NewFolder(r.fs, c.Enabled, false); err != nil {
+	if folder, err := NewFolder(c.Enabled, false); err != nil {
 		return nil, err
 	} else {
 		r.enabled = folder
@@ -65,7 +59,7 @@ func (r *nginx) String() string {
 	str := "<nginx"
 	str += fmt.Sprintf(" label=%q", r.label)
 	if r.root != "" {
-		str += fmt.Sprintf(" path=%q", pathSeparator+r.root)
+		str += fmt.Sprintf(" path=%q", r.root)
 	}
 	str += fmt.Sprintf(" available=%q", r.available.RelPath(r.root))
 	str += fmt.Sprintf(" enabled=%q", r.enabled.RelPath(r.root))
@@ -96,7 +90,7 @@ func (r *nginx) Enumerate() ([]NginxConfig, error) {
 	// Create map of available files, based on MD5 hash
 	config := make(map[string]*File, len(available))
 	for _, file := range available {
-		data, err := file.Read(r.fs)
+		data, err := file.Read()
 		if err != nil {
 			result = multierror.Append(result, err)
 			continue
@@ -106,8 +100,6 @@ func (r *nginx) Enumerate() ([]NginxConfig, error) {
 			result = multierror.Append(result, ErrInternalAppError.Withf("%v: duplicate", file.Path()))
 			continue
 		} else {
-			file.SetAvailable(true)
-			file.SetEnabled(false)
 			config[hash] = file
 		}
 	}
@@ -119,7 +111,7 @@ func (r *nginx) Enumerate() ([]NginxConfig, error) {
 
 	// Set enabled if the file exists in the map
 	for _, file := range enabled {
-		data, err := file.Read(r.fs)
+		data, err := file.Read()
 		if err != nil {
 			result = multierror.Append(result, err)
 			continue
@@ -127,10 +119,9 @@ func (r *nginx) Enumerate() ([]NginxConfig, error) {
 		hash := util.MD5Hash(data)
 		if configfile, exists := config[hash]; !exists {
 			config[hash] = file
-			file.SetEnabled(true)
-			file.SetAvailable(false)
+			file.SetEnabled(configfile.Path())
 		} else {
-			configfile.SetEnabled(true)
+			configfile.SetEnabled(configfile.Path())
 		}
 	}
 
@@ -151,10 +142,53 @@ func (r *nginx) Enable(file NginxConfig) error {
 		return ErrBadParameter
 	}
 
-	return ErrNotImplemented
+	// Create a path for the file, based on the existing filename
+	enabled_path := filepath.Join(r.enabled.RelPath(""), file_.Name())
+	if err := os.Symlink(file_.Path(), enabled_path); err != nil {
+		return err
+	} else {
+		file_.SetEnabled(enabled_path)
+	}
+
+	// Return success
+	return nil
+}
+
+// Disable a configuration
+func (r *nginx) Disable(file NginxConfig) error {
+	file_, ok := file.(*File)
+	if !ok || file_ == nil {
+		return ErrBadParameter
+	}
+	return file_.Disable()
+}
+
+// Create a configuration
+func (r *nginx) Create(name string, data []byte) (NginxConfig, error) {
+	// Check parameters
+	name = strings.TrimPrefix(name, defaultExt)
+	if !util.IsIdentifier(name) {
+		return nil, ErrBadParameter.Withf("Invalid name: %q", name)
+	}
+	if len(data) == 0 {
+		return nil, ErrBadParameter.Withf("Invalid data")
+	}
+
+	// If path already exists, then error
+	path := filepath.Join(r.available.RelPath(""), name+defaultExt)
+	if _, err := os.Stat(path); err == nil {
+		return nil, ErrDuplicateEntry.With(name)
+	}
+
+	// Create file and return it
+	return CreateFile(path, data)
 }
 
 // Revoke a configuration
-func (r *nginx) Revoke(NginxConfig) error {
-	return ErrNotImplemented
+func (r *nginx) Revoke(file NginxConfig) error {
+	file_, ok := file.(*File)
+	if !ok || file_ == nil {
+		return ErrBadParameter
+	}
+	return file_.Revoke()
 }

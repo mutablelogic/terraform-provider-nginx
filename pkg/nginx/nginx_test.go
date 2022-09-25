@@ -51,6 +51,19 @@ func Test_Nginx_001(t *testing.T) {
 			if err := nginx.(plugin.Nginx).Enable(config); err != nil {
 				t.Error(err)
 			}
+		} else {
+			t.Error("Unexpected enabled config", config.Name())
+		}
+	}
+
+	// Disable all configs
+	for _, config := range configs {
+		if config.Enabled() {
+			if err := nginx.(plugin.Nginx).Disable(config); err != nil {
+				t.Error(err)
+			}
+		} else {
+			t.Error("Unexpected disabled config", config.Name())
 		}
 	}
 }

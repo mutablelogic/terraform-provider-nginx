@@ -2,10 +2,8 @@ package nginx
 
 import (
 	"context"
-	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 
 	// Modules
 	util "github.com/mutablelogic/terraform-provider-nginx/pkg/util"
@@ -35,6 +33,8 @@ const (
 	defaultAvailable = "sites-available"
 	defaultEnabled   = "sites-enabled"
 	defaultPidPath   = "/run/nginx.pid"
+	defaultExt       = ".conf"
+	defaultFileMode  = 0644
 	pathSeparator    = string(os.PathSeparator)
 )
 
@@ -47,8 +47,6 @@ func (c Config) Name() string {
 
 // Return a new task. Label for the task can be retrieved from context
 func (c Config) New(ctx context.Context, provider Provider) (Task, error) {
-	filesys := os.DirFS(pathSeparator).(fs.StatFS)
-
 	// Set label
 	if c.Label == "" {
 		c.Label = DefaultLabel
@@ -72,8 +70,7 @@ func (c Config) New(ctx context.Context, provider Provider) (Task, error) {
 			c.Path = filepath.Join(cwd, c.Path)
 		}
 	}
-	c.Path = strings.TrimPrefix(c.Path, pathSeparator)
-	if info, err := filesys.Stat(c.Path); err != nil {
+	if info, err := os.Stat(c.Path); err != nil {
 		return nil, ErrBadParameter.With(err)
 	} else if !info.IsDir() {
 		return nil, ErrBadParameter.With(c.Path)
@@ -96,5 +93,5 @@ func (c Config) New(ctx context.Context, provider Provider) (Task, error) {
 	}
 
 	// Return configuration
-	return NewWithConfig(filesys, c)
+	return NewWithConfig(c)
 }
