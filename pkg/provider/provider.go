@@ -63,7 +63,7 @@ func New() *provider {
 
 // Return channels for events
 func (p *provider) C() <-chan Event {
-	return nil
+	return p.ch
 }
 
 func (p *provider) Label() string {
@@ -89,7 +89,7 @@ func (p *provider) Run(ctx context.Context) error {
 						return
 					case event := <-ch:
 						if event != nil && !event.Emit(p.ch) {
-							panic(fmt.Sprint("Unable to emit:", event))
+							panic(fmt.Sprintln("Unable to emit: ", event))
 						}
 					}
 				}

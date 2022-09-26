@@ -2,6 +2,7 @@ package event
 
 import (
 	"fmt"
+	"strconv"
 
 	// Namespace imports
 	. "github.com/mutablelogic/terraform-provider-nginx"
@@ -32,15 +33,10 @@ func NewError(err error) *event {
 func (e *event) String() string {
 	str := "<event"
 	if e.key != nil {
-		str += fmt.Sprint(" key=", e.key)
+		str += fmt.Sprint(" key=", toString(e.key))
 	}
 	if e.value != nil {
-		switch e.value.(type) {
-		case string:
-			str += fmt.Sprintf(" value=%q", e.value)
-		default:
-			str += fmt.Sprint(" value=", e.value)
-		}
+		str += fmt.Sprint(" value=", toString(e.value))
 	}
 	if e.err != nil {
 		str += fmt.Sprint(" error=", e.err)
@@ -69,5 +65,17 @@ func (e *event) Emit(ch chan<- Event) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+/////////////////////////////////////////////////////////////////////
+//PRIVATE METHODS
+
+func toString(v any) string {
+	switch v := v.(type) {
+	case string:
+		return strconv.Quote(v)
+	default:
+		return fmt.Sprint(v)
 	}
 }

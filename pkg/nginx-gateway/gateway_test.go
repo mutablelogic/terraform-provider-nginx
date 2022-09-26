@@ -88,32 +88,25 @@ func Test_NginxGateway_002(t *testing.T) {
 	// Run tasks until cancel
 	var wg sync.WaitGroup
 	ctx, cancel := context.WithCancel(ctx)
-	wg.Add(1)
+	wg.Add(2)
 	go func() {
 		defer wg.Done()
 		t.Log("Running provider")
 		if err := provider.Run(ctx); err != nil {
 			t.Error(err)
-		} else {
-			t.Log("Finished running provider")
 		}
+		t.Log("Finished running provider")
 	}()
-	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		t.Log("Running event handler")
-		for {
-			select {
-			case <-ctx.Done():
-				t.Log("Finished running event handler")
-				return
-			case event := <-provider.C():
-				t.Log(event)
-			}
+		for event := range provider.C() {
+			t.Log(event)
 		}
+		t.Log("Finished event handler")
 	}()
 
-	time.Sleep(time.Second)
+	time.Sleep(10 * time.Second)
 	cancel()
 	wg.Wait()
 }

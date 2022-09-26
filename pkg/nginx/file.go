@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 
 	// Namespace imports
@@ -79,7 +80,7 @@ func (f *File) Path() string {
 
 // Return the name of the configuration
 func (f *File) Name() string {
-	return strings.TrimSuffix(f.info.Name(), defaultExt)
+	return strings.TrimSuffix(filepath.Base(f.path), defaultExt)
 }
 
 // Set the enabled path

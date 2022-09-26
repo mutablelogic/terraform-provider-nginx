@@ -34,7 +34,7 @@ func NewWithConfig(c Config) (Task, error) {
 	plugin := new(gateway)
 	plugin.label = c.Label
 	plugin.prefix = c.Prefix
-	plugin.ch = make(chan Event)
+	plugin.ch = make(chan Event, 100)
 	plugin.Nginx = c.Nginx.(Nginx)
 
 	// Register handlers

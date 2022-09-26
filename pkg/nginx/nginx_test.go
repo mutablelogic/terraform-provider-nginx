@@ -94,7 +94,6 @@ func Test_Nginx_002(t *testing.T) {
 
 	// Run for 5 seconds
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	// Run
 	var wg sync.WaitGroup
@@ -108,12 +107,22 @@ func Test_Nginx_002(t *testing.T) {
 	cfg, err := nginx.(plugin.Nginx).Create("test", []byte("new config"))
 	if err != nil {
 		t.Error(err)
-	} else if err := nginx.(plugin.Nginx).Revoke(cfg); err != nil {
-		t.Error(err)
-	} else {
-		t.Log("config=", cfg)
 	}
 
+	// Enable config
+	if err := nginx.(plugin.Nginx).Enable(cfg); err != nil {
+		t.Error(err)
+	}
+
+	// Revoke config
+	if err := nginx.(plugin.Nginx).Revoke(cfg); err != nil {
+		t.Error(err)
+	}
+
+	// Wait for five seconds
 	time.Sleep(5 * time.Second)
-	wg.Wait() // wait for Run to end before deleting temp folder
+
+	// Cancel and wait
+	cancel()
+	wg.Wait()
 }

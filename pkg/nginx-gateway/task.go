@@ -2,6 +2,7 @@ package nginx_gateway
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	// Namespace imports
@@ -54,6 +55,7 @@ func (plugin *gateway) enumerate() error {
 		return err
 	}
 	for _, config := range configs {
+		fmt.Println("emit", config)
 		name := config.Name()
 		event.NewEvent(name, config).Emit(plugin.ch)
 	}
