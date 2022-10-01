@@ -60,6 +60,12 @@ func (e *event) Error() error {
 }
 
 func (e *event) Emit(ch chan<- Event) bool {
+	// Unbuffered channels block
+	if cap(ch) == 0 {
+		ch <- e
+		return true
+	}
+	// Buffered channels don't block
 	select {
 	case ch <- e:
 		return true

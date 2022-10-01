@@ -13,12 +13,6 @@ type Provider interface {
 
 	// Create a new task
 	New(ctx context.Context, config TaskPlugin) (Task, error)
-
-	// Return a task with the given label
-	TaskWithLabel(string) Task
-
-	// Return tasks with the given name
-	TasksWithName(string) []Task
 }
 
 // TaskPlugin provides methods to register a Task

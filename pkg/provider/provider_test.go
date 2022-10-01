@@ -149,6 +149,7 @@ type task struct {
 }
 
 type instance struct {
+	event.PubSub
 	label string
 }
 
@@ -170,7 +171,7 @@ func (i *instance) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-time.After(1 * time.Second):
-			event.NewEvent(nil, "Tick").Emit(i.ch)
+			i.Emit(event.NewEvent(nil, "Tick"))
 			fmt.Println("Tick")
 		}
 	}
@@ -178,10 +179,6 @@ func (i *instance) Run(ctx context.Context) error {
 
 func (i *instance) Label() string {
 	return i.label
-}
-
-func (i *instance) C() <-chan Event {
-	return i.ch
 }
 
 func (i *instance) in(tasks []Task) bool {

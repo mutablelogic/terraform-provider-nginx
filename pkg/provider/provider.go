@@ -9,7 +9,8 @@ import (
 	"sync"
 
 	// Module imports
-	"github.com/hashicorp/go-multierror"
+	multierror "github.com/hashicorp/go-multierror"
+	event "github.com/mutablelogic/terraform-provider-nginx/pkg/event"
 
 	// Namespace imports
 	. "github.com/djthorpe/go-errors"
@@ -20,14 +21,13 @@ import (
 // TYPES
 
 type provider struct {
+	event.PubSub
+
 	// Enumeration of task plugins, keyed by name
 	plugins map[string]reflect.Type
 
 	// Enumeration of tasks, keyed by label
 	tasks map[string]task_
-
-	// Event channel
-	ch chan Event
 }
 
 type task_ struct {
@@ -50,21 +50,16 @@ var (
 ///////////////////////////////////////////////////////////////////////////////
 // LIFECYCLE
 
+// New creates a new empty provider with no tasks
 func New() *provider {
 	p := new(provider)
 	p.plugins = make(map[string]reflect.Type)
 	p.tasks = make(map[string]task_)
-	p.ch = make(chan Event)
 	return p
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // PUBLIC FUNCTIONS - TASK
-
-// Return channels for events
-func (p *provider) C() <-chan Event {
-	return p.ch
-}
 
 func (p *provider) Label() string {
 	return "provider"
@@ -88,7 +83,7 @@ func (p *provider) Run(ctx context.Context) error {
 					case <-ctx.Done():
 						return
 					case event := <-ch:
-						if event != nil && !event.Emit(p.ch) {
+						if event != nil && !p.Emit(event) {
 							panic(fmt.Sprintln("Unable to emit: ", event))
 						}
 					}
@@ -111,7 +106,7 @@ func (p *provider) Run(ctx context.Context) error {
 	// TODO: Close tasks in the reverse order they were created
 
 	// Close channel
-	close(p.ch)
+	p.Emit(nil)
 
 	// Return any errors
 	return result
