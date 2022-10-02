@@ -1,5 +1,3 @@
-//
-
 /*
 Package provider co-ordinates tasks and events for the lifecycle
 of the application.

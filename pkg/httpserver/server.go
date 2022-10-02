@@ -71,7 +71,7 @@ func NewWithConfig(c Config) (*httpserver, error) {
 	}
 
 	// Create net server
-	if err := this.netserver(c.Addr, tlsconfig, c.Timeout, c.Router.(http.Handler)); err != nil {
+	if err := this.netserver(c.Addr, tlsconfig, time.Duration(c.Timeout), c.Router.(http.Handler)); err != nil {
 		return nil, err
 	}
 

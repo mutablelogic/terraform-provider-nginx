@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"os/signal"
 )
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -22,7 +24,32 @@ const (
 	contextPrefix
 	contextParams
 	contextAdmin
+	contextAddress
 )
+
+///////////////////////////////////////////////////////////////////////////////
+// LIFECYCLE
+
+func ContextForSignal(signals ...os.Signal) context.Context {
+	if len(signals) == 0 {
+		return nil
+	}
+
+	ch := make(chan os.Signal)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Send message on channel when signal received
+	signal.Notify(ch, signals...)
+
+	// When any signal received, call cancel
+	go func() {
+		<-ch
+		cancel()
+	}()
+
+	// Return success
+	return ctx
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 // CREATE CONTEXT
@@ -43,6 +70,10 @@ func WithAdmin(ctx context.Context, admin bool) context.Context {
 	return context.WithValue(ctx, contextAdmin, admin)
 }
 
+func WithAddress(ctx context.Context, addr string) context.Context {
+	return context.WithValue(ctx, contextAddress, addr)
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // RETURN VALUES FROM CONTEXT
 
@@ -56,6 +87,10 @@ func Label(ctx context.Context) string {
 
 func Admin(ctx context.Context) bool {
 	return contextBool(ctx, contextAdmin)
+}
+
+func Address(ctx context.Context) string {
+	return contextString(ctx, contextAddress)
 }
 
 func ReqParams(req *http.Request) []string {
@@ -97,6 +132,9 @@ func DumpContext(ctx context.Context, w io.Writer) {
 	}
 	if value, ok := ctx.Value(contextBool).(bool); ok {
 		fmt.Fprintf(w, " admin=%v", value)
+	}
+	if value, ok := ctx.Value(contextAddress).(string); ok {
+		fmt.Fprintf(w, " address=%q", value)
 	}
 	fmt.Fprintf(w, ">")
 }

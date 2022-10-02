@@ -10,11 +10,11 @@ import (
 
 	// Module imports
 	multierror "github.com/hashicorp/go-multierror"
+	iface "github.com/mutablelogic/terraform-provider-nginx"
 	event "github.com/mutablelogic/terraform-provider-nginx/pkg/event"
 
 	// Namespace imports
 	. "github.com/djthorpe/go-errors"
-	. "github.com/mutablelogic/terraform-provider-nginx"
 )
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -27,17 +27,7 @@ type provider struct {
 	plugins map[string]reflect.Type
 
 	// Enumeration of tasks, keyed by label
-	tasks map[string]task_
-}
-
-type task_ struct {
-	Task
-
-	// Name of task (not necessarily unique)
-	name string
-
-	// Label of the task (unique)
-	label string
+	tasks map[string]iface.Task
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -54,7 +44,7 @@ var (
 func New() *provider {
 	p := new(provider)
 	p.plugins = make(map[string]reflect.Type)
-	p.tasks = make(map[string]task_)
+	p.tasks = make(map[string]iface.Task)
 	return p
 }
 
@@ -74,7 +64,7 @@ func (p *provider) Run(ctx context.Context) error {
 		wg.Add(2)
 
 		// Emit events from task
-		go func(task Task) {
+		go func(task iface.Task) {
 			defer wg.Done()
 			ch := task.C()
 			if ch != nil {
@@ -92,12 +82,12 @@ func (p *provider) Run(ctx context.Context) error {
 		}(task)
 
 		// Run task
-		go func(label string, task Task) {
+		go func(label string, task iface.Task) {
 			defer wg.Done()
 			if err := task.Run(ctx); err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 				result = multierror.Append(result, fmt.Errorf("%v: %w", label, err))
 			}
-		}(label, task.Task)
+		}(label, task)
 	}
 
 	// Wait until all tasks are completed
@@ -122,7 +112,7 @@ func (p *provider) String() string {
 }
 
 // New creates a new task from a configuration with a unique label
-func (p *provider) New(ctx context.Context, config TaskPlugin) (Task, error) {
+func (p *provider) New(ctx context.Context, config iface.TaskPlugin) (iface.Task, error) {
 	name := config.Name()
 
 	// Check the plugin by type
@@ -145,29 +135,12 @@ func (p *provider) New(ctx context.Context, config TaskPlugin) (Task, error) {
 		return nil, ErrInternalAppError.Withf("Unexpected nil return when creating task %q ", name)
 	} else if label := task.Label(); !reTaskName.MatchString(label) {
 		return nil, ErrBadParameter.Withf("Invalid label %q for task %q ", label, name)
-	} else if _, exists := p.tasks[label]; exists {
-		return nil, ErrDuplicateEntry.Withf("Task %q with label %q already exists", name, label)
+	} else if _, exists := p.tasks[name+"."+label]; exists {
+		return nil, ErrDuplicateEntry.Withf("Task with label %q already exists", name+"."+label)
 	} else {
-		p.tasks[label] = task_{task, name, label}
+		p.tasks[name+"."+label] = task
 	}
 
 	// Return success
 	return task, nil
-}
-
-// TaskWithLabel return a task with the given label or nil if not found
-func (p *provider) TaskWithLabel(label string) Task {
-	return p.tasks[label].Task
-}
-
-// TasksWithName returns a slice of tasks with the given name, or if name is empty
-// return all tasks
-func (p *provider) TasksWithName(name string) []Task {
-	result := []Task{}
-	for _, task := range p.tasks {
-		if name == task.name || name == "" {
-			result = append(result, task.Task)
-		}
-	}
-	return result
 }

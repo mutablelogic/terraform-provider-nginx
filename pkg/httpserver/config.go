@@ -9,7 +9,8 @@ import (
 	. "github.com/mutablelogic/terraform-provider-nginx"
 
 	// Module imports
-	"github.com/mutablelogic/terraform-provider-nginx/pkg/router"
+	router "github.com/mutablelogic/terraform-provider-nginx/pkg/router"
+	types "github.com/mutablelogic/terraform-provider-nginx/pkg/types"
 	util "github.com/mutablelogic/terraform-provider-nginx/pkg/util"
 )
 
@@ -17,11 +18,11 @@ import (
 // TYPES
 
 type Config struct {
-	Label   string        `hcl:"label,label"`
-	Router  Task          `hcl:"router,optional"`
-	Addr    string        `hcl:"listen,optional"`  // Address or path for binding HTTP server
-	TLS     *TLS          `hcl:"tls,block"`        // TLS parameters
-	Timeout time.Duration `hcl:"timeout,optional"` // Read timeout on HTTP requests
+	Label   string         `hcl:"label,label"`
+	Router  Task           `hcl:"router,optional"`
+	Addr    string         `hcl:"listen,optional"`  // Address or path for binding HTTP server
+	TLS     *TLS           `hcl:"tls,block"`        // TLS parameters
+	Timeout types.Duration `hcl:"timeout,optional"` // Read timeout on HTTP requests
 }
 
 type TLS struct {
@@ -52,7 +53,7 @@ func (c Config) New(ctx context.Context, provider Provider) (Task, error) {
 	}
 	// Set timeout
 	if c.Timeout == 0 {
-		c.Timeout = DefaultTimeout
+		c.Timeout = types.Duration(DefaultTimeout)
 	}
 	// Check label
 	if !util.IsIdentifier(c.Label) {

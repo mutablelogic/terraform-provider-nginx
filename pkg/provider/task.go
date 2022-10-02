@@ -39,16 +39,16 @@ func (c Config) Name() string {
 
 // Create a task instance from a configuration
 func (c Config) New(context.Context, iface.Provider) (iface.Task, error) {
-	task := new(Task)
+	t := new(Task)
 
 	if !util.IsIdentifier(c.Label) {
 		return nil, ErrBadParameter.Withf("label: %q", c.Label)
 	} else {
-		task.label = c.Label
+		t.label = c.Label
 	}
 
 	// Return success
-	return task, nil
+	return t, nil
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -65,6 +65,17 @@ func (task *Task) String() string {
 
 func (task *Task) Label() string {
 	return task.label
+}
+
+func (task *Task) SetLabel(value string) error {
+	if !util.IsIdentifier(value) {
+		return ErrBadParameter.Withf("label: %q", value)
+	} else {
+		task.label = value
+	}
+
+	// Return success
+	return nil
 }
 
 func (task *Task) Run(ctx context.Context) error {

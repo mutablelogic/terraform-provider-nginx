@@ -23,7 +23,7 @@ PLUGIN_DIR := $(wildcard plugin/*)
 CMD_DIR := $(wildcard cmd/*)
 
 # Targets
-all: clean cmd
+all: clean cmd plugins
 
 cmd: $(filter-out cmd/README.md, $(wildcard cmd/*))
 
@@ -33,11 +33,11 @@ test:
 	@${GO} mod tidy
 	@${GO} test -v ./pkg/...
 
-$(CMD_DIR): dependencies mkdir FORCE
+$(CMD_DIR): dependencies mkdir
 	@echo Build cmd $(notdir $@)
 	@${GO} build ${BUILD_FLAGS} -o ${BUILD_DIR}/$(notdir $@) ./$@
 
-$(PLUGIN_DIR): dependencies mkdir FORCE
+$(PLUGIN_DIR): dependencies mkdir
 	@echo Build plugin $(notdir $@)
 	@${GO} build -buildmode=plugin ${BUILD_FLAGS} -o ${BUILD_DIR}/$(notdir $@).plugin ./$@
 
@@ -53,14 +53,10 @@ docker: dependencies docker-dependencies
 FORCE:
 
 docker-dependencies:
-ifeq (,${DOCKER})
-        $(error "Missing docker binary")
-endif
+	@test -x ${DOCKER} || (echo "Docker not found" && exit 1)
 
 dependencies:
-ifeq (,${GO})
-        $(error "Missing go binary")
-endif
+	@test -x ${GO} || (echo "Missing go binary" && exit 1)
 
 mkdir:
 	@echo Mkdir ${BUILD_DIR}

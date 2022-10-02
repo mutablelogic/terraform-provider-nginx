@@ -1,0 +1,6 @@
+{
+    "resource": "httpserver",
+    "label": "main",
+    "addr": ":80",
+    "timeout": "10s"
+}

@@ -2,12 +2,12 @@ package main
 
 import (
 	// Modules
-	tokenauth "github.com/mutablelogic/terraform-provider-nginx/pkg/tokenauth"
+	logger "github.com/mutablelogic/terraform-provider-nginx/pkg/logger"
 
 	// Namespace imports
 	. "github.com/mutablelogic/terraform-provider-nginx"
 )
 
 func Config() TaskPlugin {
-	return tokenauth.Config{}
+	return logger.Config{}
 }
