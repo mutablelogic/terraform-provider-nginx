@@ -20,7 +20,6 @@ import (
 // TYPES
 
 type nginx struct {
-	label     string
 	root      string
 	available *Folder
 	enabled   *Folder
@@ -31,7 +30,6 @@ type nginx struct {
 
 func NewWithConfig(c Config) (Task, error) {
 	r := new(nginx)
-	r.label = c.Label
 	r.root = c.Path
 
 	// Set up available folder
@@ -57,7 +55,6 @@ func NewWithConfig(c Config) (Task, error) {
 
 func (r *nginx) String() string {
 	str := "<nginx"
-	str += fmt.Sprintf(" label=%q", r.label)
 	if r.root != "" {
 		str += fmt.Sprintf(" path=%q", r.root)
 	}

@@ -10,8 +10,9 @@ import (
 
 	// Module imports
 	context "github.com/mutablelogic/terraform-provider-nginx/pkg/context"
+	provider "github.com/mutablelogic/terraform-provider-nginx/pkg/provider"
 	util "github.com/mutablelogic/terraform-provider-nginx/pkg/util"
-	"golang.org/x/exp/slices"
+	slices "golang.org/x/exp/slices"
 
 	// Namespace imports
 	. "github.com/djthorpe/go-errors"
@@ -22,8 +23,9 @@ import (
 // TYPES
 
 type router struct {
+	provider.Task
 	sync.RWMutex
-	label  string
+
 	routes []route
 	cache  map[string]*cached
 	middleware
@@ -46,7 +48,6 @@ type route struct {
 
 func NewWithConfig(c Config) (Router, error) {
 	r := new(router)
-	r.label = c.Label
 	r.cache = make(map[string]*cached)
 
 	// Return success
@@ -58,7 +59,6 @@ func NewWithConfig(c Config) (Router, error) {
 
 func (r *router) String() string {
 	str := "<router"
-	str += fmt.Sprintf(" label=%q", r.label)
 	for _, route := range r.routes {
 		str += fmt.Sprintf(" %q %q => %q", route.prefix, route.path, route.methods)
 	}

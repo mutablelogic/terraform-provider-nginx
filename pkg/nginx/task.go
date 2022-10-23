@@ -16,11 +16,6 @@ func (r *nginx) Run(ctx context.Context) error {
 	return ctx.Err()
 }
 
-// Return label
-func (r *nginx) Label() string {
-	return r.label
-}
-
 // Return event channel
 func (*nginx) C() <-chan Event {
 	return nil

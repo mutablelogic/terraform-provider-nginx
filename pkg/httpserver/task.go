@@ -30,11 +30,6 @@ func (r *httpserver) Run(ctx context.Context) error {
 	return result
 }
 
-// Return label
-func (r *httpserver) Label() string {
-	return r.label
-}
-
 // Return event channel. No events are sent by the httpserver
 func (*httpserver) C() <-chan Event {
 	return nil

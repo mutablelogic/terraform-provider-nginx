@@ -22,7 +22,7 @@ func Test_PubSub_002(t *testing.T) {
 	var wg sync.WaitGroup
 
 	p := new(PubSub)
-	ch := p.C()
+	ch := p.Sub()
 	n := 100
 	m := 0
 
@@ -61,7 +61,7 @@ func Test_PubSub_003(t *testing.T) {
 	m := 0
 
 	for r := 0; r < 5; r++ {
-		ch := p.C()
+		ch := p.Sub()
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()

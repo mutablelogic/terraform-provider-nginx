@@ -2,32 +2,25 @@ package router
 
 import (
 	"context"
-	"regexp"
 
 	// Namespace imports
 	. "github.com/djthorpe/go-errors"
 	. "github.com/mutablelogic/terraform-provider-nginx"
+	"github.com/mutablelogic/terraform-provider-nginx/pkg/util"
 )
 
 /////////////////////////////////////////////////////////////////////
 // TYPES
 
 type Config struct {
-	Label string `hcl:"label,label"`
+	L string `hcl:"label,label" json:"label,omitempty"`
 }
 
 /////////////////////////////////////////////////////////////////////
 // GLOBALS
 
 const (
-	DefaultLabel = "router"
-)
-
-var (
-	reValidName = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_\-]+$`)
-)
-
-const (
+	DefaultLabel  = "router"
 	pathSeparator = "/"
 )
 
@@ -38,15 +31,21 @@ func (c Config) Name() string {
 	return DefaultLabel
 }
 
+func (c Config) Label() string {
+	if c.L == "" {
+		return DefaultLabel
+	} else {
+		return c.L
+	}
+}
+
 // Return a new task. Label for the task can be retrieved from context
 func (c Config) New(ctx context.Context, provider Provider) (Task, error) {
-	// Set label
-	if c.Label == "" {
-		c.Label = DefaultLabel
+	if c.L == "" {
+		c.L = DefaultLabel
 	}
-	// Check label
-	if reValidName.MatchString(c.Label) == false {
-		return nil, ErrBadParameter.Withf("label: %q", c.Label)
+	if !util.IsIdentifier(c.Label()) {
+		return nil, ErrBadParameter.Withf("label: %q", c.L)
 	}
 
 	// Return configuration

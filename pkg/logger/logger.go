@@ -2,7 +2,6 @@ package logger
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	// Modules
@@ -24,12 +23,7 @@ type logger struct {
 // LIFECYCLE
 
 func NewWithConfig(c Config) (Logger, error) {
-	r := new(logger)
-
-	r.SetLabel(c.Label)
-
-	// Return success
-	return r, nil
+	return new(logger), nil
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -37,7 +31,6 @@ func NewWithConfig(c Config) (Logger, error) {
 
 func (r *logger) String() string {
 	str := "<logger"
-	str += fmt.Sprintf(" label=%q", r.Label())
 	return str + ">"
 }
 

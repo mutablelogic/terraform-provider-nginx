@@ -18,8 +18,9 @@ import (
 // TYPES
 
 type Resource struct {
-	Name string `json:"resource"`
-	Path string `json:"-"`
+	Name  string `json:"resource"`
+	Label string `json:"label"`
+	Path  string `json:"-"`
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -54,8 +55,9 @@ func LoadJSONForPattern(filesys fs.FS, pattern string) ([]Resource, error) {
 	return resources, result
 }
 
-func ParseJSONResource(filesys fs.FS, resource Resource, plugin TaskPlugin) (TaskPlugin, error) {
-	plugin = newPluginInstance(plugin)
+// ParseJSONResource will return a TaskPlugin given a resource and a prototype
+func ParseJSONResource(filesys fs.FS, resource Resource, proto TaskPlugin) (TaskPlugin, error) {
+	plugin := newPluginInstance(proto)
 	if data, err := fs.ReadFile(filesys, resource.Path); err != nil {
 		return nil, err
 	} else if err := json.Unmarshal(data, plugin); err != nil {

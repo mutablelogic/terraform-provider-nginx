@@ -19,11 +19,13 @@ type event struct {
 /////////////////////////////////////////////////////////////////////
 // LIFECYCLE
 
-func NewEvent(key, value any) *event {
+// NewEvent is called to create an event with an arbitary key and value
+func NewEvent(key, value any) Event {
 	return &event{key, value, nil}
 }
 
-func NewError(err error) *event {
+// NewError is called to create an error event
+func NewError(err error) Event {
 	return &event{nil, nil, err}
 }
 
@@ -75,7 +77,7 @@ func (e *event) Emit(ch chan<- Event) bool {
 }
 
 /////////////////////////////////////////////////////////////////////
-//PRIVATE METHODS
+// PRIVATE METHODS
 
 func toString(v any) string {
 	switch v := v.(type) {

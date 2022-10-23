@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 
 	// Modules
@@ -110,12 +111,28 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Subscribe to events from the provider
+	var wg sync.WaitGroup
+	var retVal = 0
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for evt := range provider.Sub() {
+			fmt.Printf("event=%v\n", evt)
+		}
+	}()
+
 	// Run the provider until done
 	fmt.Println("Press CTRL+C to exit")
 	if err := provider.Run(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(-1)
+		retVal = -1
 	}
+
+	// Wait for end of events
+	wg.Wait()
+	fmt.Println("Done")
+	os.Exit(retVal)
 }
 
 func GetPluginPath(defaultPath string) (string, error) {

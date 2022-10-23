@@ -5,13 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"regexp"
 	"sync"
 
 	// Module imports
 	multierror "github.com/hashicorp/go-multierror"
 	iface "github.com/mutablelogic/terraform-provider-nginx"
 	event "github.com/mutablelogic/terraform-provider-nginx/pkg/event"
+	util "github.com/mutablelogic/terraform-provider-nginx/pkg/util"
 
 	// Namespace imports
 	. "github.com/djthorpe/go-errors"
@@ -29,13 +29,6 @@ type provider struct {
 	// Enumeration of tasks, keyed by label
 	tasks map[string]iface.Task
 }
-
-///////////////////////////////////////////////////////////////////////////////
-// GLOBALS
-
-var (
-	reTaskName = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_-]+$`)
-)
 
 ///////////////////////////////////////////////////////////////////////////////
 // LIFECYCLE
@@ -66,7 +59,7 @@ func (p *provider) Run(ctx context.Context) error {
 		// Emit events from task
 		go func(task iface.Task) {
 			defer wg.Done()
-			ch := task.C()
+			ch := task.Sub()
 			if ch != nil {
 				for {
 					select {
@@ -108,6 +101,9 @@ func (p *provider) Run(ctx context.Context) error {
 func (p *provider) String() string {
 	str := "<provider"
 	str += fmt.Sprintf(" label=%q", p.Label())
+	for label, task := range p.tasks {
+		str += fmt.Sprintf(" %v=%v", label, task)
+	}
 	return str + ">"
 }
 
@@ -117,7 +113,7 @@ func (p *provider) New(ctx context.Context, config iface.TaskPlugin) (iface.Task
 
 	// Check the plugin by type
 	t := reflect.TypeOf(config)
-	if !reTaskName.MatchString(name) {
+	if !util.IsIdentifier(name) {
 		return nil, ErrBadParameter.Withf("Invalid name %q for plugin", name)
 	} else if t_, exists := p.plugins[name]; exists {
 		if t != t_ {
@@ -127,18 +123,26 @@ func (p *provider) New(ctx context.Context, config iface.TaskPlugin) (iface.Task
 		p.plugins[name] = t
 	}
 
+	// Check label
+	label := config.Label()
+	if !util.IsIdentifier(label) {
+		return nil, ErrBadParameter.Withf("Invalid label %q for task %q ", label, name)
+	}
+
 	// Create a new task
 	task, err := config.New(ctx, p)
 	if err != nil {
 		return nil, err
 	} else if task == nil {
 		return nil, ErrInternalAppError.Withf("Unexpected nil return when creating task %q ", name)
-	} else if label := task.Label(); !reTaskName.MatchString(label) {
-		return nil, ErrBadParameter.Withf("Invalid label %q for task %q ", label, name)
-	} else if _, exists := p.tasks[name+"."+label]; exists {
-		return nil, ErrDuplicateEntry.Withf("Task with label %q already exists", name+"."+label)
+	}
+
+	// Add resource to map
+	key := name + "." + label
+	if _, exists := p.tasks[key]; exists {
+		return nil, ErrDuplicateEntry.Withf("Resource %q already exists", key)
 	} else {
-		p.tasks[name+"."+label] = task
+		p.tasks[key] = task
 	}
 
 	// Return success

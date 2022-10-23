@@ -6,6 +6,7 @@ import (
 	// Module imports
 
 	"github.com/mutablelogic/terraform-provider-nginx/pkg/nginx"
+	"github.com/mutablelogic/terraform-provider-nginx/pkg/types"
 	util "github.com/mutablelogic/terraform-provider-nginx/pkg/util"
 
 	// Namespace imports
@@ -18,10 +19,10 @@ import (
 // TYPES
 
 type Config struct {
-	Label  string `json:"label,omitempty"`
-	Prefix string `json:"prefix,omitempty"`
-	Nginx  Task   `json:"-"` // plugin.Nginx
-	Router Task   `json:"-"` // plugin.Router
+	Label_ string     `json:"label,omitempty"`
+	Prefix string     `json:"prefix,omitempty"`
+	Nginx  types.Task `json:"nginx"`  // plugin.Nginx
+	Router types.Task `json:"router"` // plugin.Router
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -38,17 +39,14 @@ const (
 
 func (c Config) New(ctx context.Context, provider Provider) (Task, error) {
 	// Check arguments
-	if _, ok := c.Router.(Router); c.Router == nil || !ok {
+	if _, ok := c.Router.Task.(Router); c.Router.Task == nil || !ok {
 		return nil, ErrBadParameter.With("router")
 	}
-	if _, ok := c.Nginx.(Nginx); c.Nginx == nil || !ok {
+	if _, ok := c.Nginx.Task.(Nginx); c.Nginx.Task == nil || !ok {
 		return nil, ErrBadParameter.With("nginx")
 	}
 
 	// Set configuration defaults
-	if c.Label == "" {
-		c.Label = c.Nginx.Label() + DefaultLabelSuffix
-	}
 	if c.Prefix == "" {
 		c.Prefix = "/" + c.Nginx.Label() + DefaultPathSuffix
 	}
@@ -64,4 +62,12 @@ func (c Config) New(ctx context.Context, provider Provider) (Task, error) {
 
 func (c Config) Name() string {
 	return DefaultLabel
+}
+
+func (c Config) Label() string {
+	if c.Label_ == "" {
+		return DefaultLabel
+	} else {
+		return c.Label_
+	}
 }

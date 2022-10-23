@@ -11,7 +11,7 @@ import (
 
 func Test_Task_001(t *testing.T) {
 	// create provider
-	cfg := provider.Config{Label: t.Name()}
+	cfg := provider.Config{Label_: t.Name()}
 	provider := provider.New()
 	if provider == nil {
 		t.Fatal("Expected provider")
@@ -22,7 +22,7 @@ func Test_Task_001(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for evt := range provider.C() {
+		for evt := range provider.Sub() {
 			t.Log("Received", evt)
 		}
 	}()

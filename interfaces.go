@@ -17,8 +17,8 @@ type Provider interface {
 
 // TaskPlugin provides methods to register a Task
 type TaskPlugin interface {
-	// Return the name of the task
-	Name() string
+	Name() string  // Return the name of the task
+	Label() string // Return the label of the task
 
 	// Return a new task. Label for the task can be retrieved from context
 	New(context.Context, Provider) (Task, error)
@@ -26,15 +26,15 @@ type TaskPlugin interface {
 
 // Task runs a single task, whilst emitting events
 type Task interface {
-	// Return unique label for the task
-	Label() string
-
 	// Run is called to start the task and block until context is cancelled
 	Run(context.Context) error
 
-	// C returns a channel on which events can be received, or returns nil
+	// Sub returns a channel on which events can be received, or returns nil
 	// if the task does not emit events
-	C() <-chan Event
+	Sub() <-chan Event
+
+	// Unsub is called to unsubscribe from an existing events channel
+	Unsub(<-chan Event)
 }
 
 // Event will emit key/value pairs or errors emited on a channel

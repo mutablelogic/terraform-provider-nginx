@@ -18,9 +18,8 @@ import (
 
 type httpserver struct {
 	Router
-	label string
-	srv   *http.Server
-	fcgi  *fcgi.Server
+	srv  *http.Server
+	fcgi *fcgi.Server
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -29,20 +28,19 @@ type httpserver struct {
 // Create the server
 func NewWithConfig(c Config) (*httpserver, error) {
 	this := new(httpserver)
-	this.label = c.Label
 
 	// Set router
-	if _, ok := c.Router.(http.Handler); !ok {
+	if _, ok := c.Router.Task.(http.Handler); !ok {
 		return nil, ErrInternalAppError.With("invalid router")
-	} else if _, ok := c.Router.(Router); !ok {
+	} else if _, ok := c.Router.Task.(Router); !ok {
 		return nil, ErrInternalAppError.With("invalid router")
 	} else {
-		this.Router = c.Router.(Router)
+		this.Router = c.Router.Task.(Router)
 	}
 
 	// Check addr for being (host, port). If not, then run as FCGI server
 	if _, _, err := net.SplitHostPort(c.Addr); c.Addr != "" && err != nil {
-		if err := this.fcgiserver(c.Addr, c.Router.(http.Handler)); err != nil {
+		if err := this.fcgiserver(c.Addr, c.Router.Task.(http.Handler)); err != nil {
 			return nil, err
 		} else {
 			return this, nil
@@ -71,7 +69,7 @@ func NewWithConfig(c Config) (*httpserver, error) {
 	}
 
 	// Create net server
-	if err := this.netserver(c.Addr, tlsconfig, time.Duration(c.Timeout), c.Router.(http.Handler)); err != nil {
+	if err := this.netserver(c.Addr, tlsconfig, time.Duration(c.Timeout), c.Router.Task.(http.Handler)); err != nil {
 		return nil, err
 	}
 
@@ -84,9 +82,6 @@ func NewWithConfig(c Config) (*httpserver, error) {
 
 func (this *httpserver) String() string {
 	str := "<httpserver"
-	if this.label != "" {
-		str += fmt.Sprintf(" label=%q", this.label)
-	}
 	if this.fcgi != nil {
 		str += fmt.Sprintf(" fcgi=%q", this.fcgi.Addr)
 	} else {

@@ -17,12 +17,12 @@ import (
 // TYPES
 
 type Config struct {
-	Label     string `hcl:"label,label"`                  // Label for the configuration
-	Path      string `hcl:"conf_path"`                    // Root path for the configuration
-	PidPath   string `hcl:"pid_path,optional"`            // Path to the PID file
-	Available string `hcl:"available_path,optional"`      // Path to available sites, under root
-	Recursive bool   `hcl:"available_recursive,optional"` // Recursively search in available folder
-	Enabled   string `hcl:"enabled_path,optional"`        // Path to enabled sites, under root
+	Label_    string `hcl:"label,label" json:"label,omitempty"`            // Label for the configuration
+	Path      string `hcl:"conf_path" json:"conf_path"`                    // Root path for the configuration
+	PidPath   string `hcl:"pid_path,optional" json:"pid_path"`             // Path to the PID file
+	Available string `hcl:"available_path,optional" json:"available_path"` // Path to available sites, under root
+	Recursive bool   `hcl:"available_recursive,optional" json:"recursive"` // Recursively search in available folder
+	Enabled   string `hcl:"enabled_path,optional" json:"enabled_path"`     // Path to enabled sites, under root
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -45,21 +45,24 @@ func (c Config) Name() string {
 	return DefaultLabel
 }
 
+func (c Config) Label() string {
+	if c.Label_ == "" {
+		return DefaultLabel
+	} else {
+		return c.Label_
+	}
+}
+
 // Return a new task. Label for the task can be retrieved from context
 func (c Config) New(ctx context.Context, provider Provider) (Task, error) {
-	// Set label
-	if c.Label == "" {
-		c.Label = DefaultLabel
-	}
-
 	// Set PID path
 	if c.PidPath == "" {
 		c.PidPath = defaultPidPath
 	}
 
 	// Check label
-	if !util.IsIdentifier(c.Label) {
-		return nil, ErrBadParameter.Withf("label: %q", c.Label)
+	if !util.IsIdentifier(c.Label()) {
+		return nil, ErrBadParameter.Withf("label: %q", c.Label())
 	}
 
 	// Check path
